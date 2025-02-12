@@ -2,28 +2,25 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Schema as MongooseSchema } from 'mongoose';
 
 export type AccountDocument = HydratedDocument<Account>;
-@Schema({ timestamps: true }) // Automatically adds createdAt and updatedAt fields
+@Schema({ timestamps: true })
 export class Account {
-  @Prop({ type: MongooseSchema.Types.ObjectId, required: true, unique: true })
-  account_id: string; // Primary Key
-
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Member', required: true })
-  member_id: string; // Foreign Key, referencing Member
+  member_id: string;
 
   @Prop({ required: true, unique: true })
-  username: string; // Unique username for the account
+  username: string;
 
   @Prop({ required: true })
-  password_hash: string; // Hashed password for security
+  password_hash: string;
 
   @Prop({ required: true, unique: true })
-  email: string; // Unique email for the account
+  email: string;
 
   @Prop({ default: false })
-  is_admin: boolean; // Boolean indicating admin status
+  is_admin: boolean;
 
   @Prop({ type: Date, default: Date.now })
-  created_at: Date; // Account creation timestamp
+  created_at: Date;
 }
 
 export const AccountSchema = SchemaFactory.createForClass(Account);
