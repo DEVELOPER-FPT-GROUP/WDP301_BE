@@ -5,44 +5,40 @@ export type MemberDocument = HydratedDocument<Member>;
 
 @Schema({ timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } })
 export class Member {
-  @Prop({ type: MongooseSchema.Types.ObjectId, required: true, unique: true })
-  member_id: string; // Primary Key
-
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Family', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Family'})
   family_id: string; // Foreign Key referencing Families
 
-  @Prop({ required: true })
-  first_name: string; // First name of the member
+  first_name: string;
 
   @Prop({ required: true })
-  last_name: string; // Last name of the member
+  last_name: string;
 
   @Prop({ type: Date, required: true })
-  date_of_birth: Date; // Date of birth
+  date_of_birth: Date;
 
   @Prop({ type: Date })
   date_of_death: Date; // Date of death (optional)
 
   @Prop()
-  place_of_birth: string; // Place of birth
+  place_of_birth: string;
 
   @Prop()
-  place_of_death: string; // Place of death (optional)
+  place_of_death: string;
 
   @Prop({ default: true })
-  is_alive: boolean; // Whether the member is still alive (default: true)
+  is_alive: boolean;
 
   @Prop()
-  generation: number; // The generation number of the member
+  generation: number;
 
   @Prop({ enum: ['male', 'female', 'other'], required: true })
-  gender: string; // Gender of the member
+  gender: string;
 
   @Prop({ type: Date, default: Date.now })
-  created_at: Date; // Auto-generated creation timestamp
+  createdAt: Date;
 
   @Prop({ type: Date, default: Date.now })
-  updated_at: Date; // Auto-generated update timestamp
+  updatedAt: Date;
 }
 
 export const MemberSchema = SchemaFactory.createForClass(Member);
