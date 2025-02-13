@@ -4,23 +4,23 @@ import { HydratedDocument, Schema as MongooseSchema } from 'mongoose';
 export type AccountDocument = HydratedDocument<Account>;
 @Schema({ timestamps: true })
 export class Account {
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Member', required: true })
-  member_id: string;
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Member' })
+  memberId: string;
 
-  @Prop({ required: true, unique: true })
+  @Prop({ required: true })
   username: string;
 
   @Prop({ required: true })
-  password_hash: string;
+  passwordHash: string;
 
-  @Prop({ required: true, unique: true })
+  @Prop({ required: true })
   email: string;
 
   @Prop({ default: false })
-  is_admin: boolean;
+  isAdmin: boolean;
 
-  @Prop({ type: Date, default: Date.now })
-  created_at: Date;
+  @Prop({ default: Date.now })
+  createdAt: Date;
 }
 
 export const AccountSchema = SchemaFactory.createForClass(Account);
