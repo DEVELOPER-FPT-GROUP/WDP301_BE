@@ -3,41 +3,42 @@ import { HydratedDocument, Schema as MongooseSchema } from 'mongoose';
 
 export type MemberDocument = HydratedDocument<Member>;
 
-@Schema({ timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } })
+@Schema({ timestamps: true })
 export class Member {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Family'})
-  family_id: string; // Foreign Key referencing Families
-
-  first_name: string;
-
-  @Prop({ required: true })
-  last_name: string;
-
-  @Prop({ type: Date, required: true })
-  date_of_birth: Date;
-
-  @Prop({ type: Date })
-  date_of_death: Date; // Date of death (optional)
+  familyId: string;
 
   @Prop()
-  place_of_birth: string;
+  firstName: string;
 
   @Prop()
-  place_of_death: string;
+  lastName: string;
+
+  @Prop()
+  dateOfBirth: Date;
+
+  @Prop()
+  dateOfDeath: Date;
+
+  @Prop()
+  placeOfBirth: string;
+
+  @Prop()
+  placeOfDeath: string;
 
   @Prop({ default: true })
-  is_alive: boolean;
+  isAlive: boolean;
 
   @Prop()
   generation: number;
 
-  @Prop({ enum: ['male', 'female', 'other'], required: true })
+  @Prop()
   gender: string;
 
-  @Prop({ type: Date, default: Date.now })
+  @Prop({ default: Date.now })
   createdAt: Date;
 
-  @Prop({ type: Date, default: Date.now })
+  @Prop({ default: Date.now })
   updatedAt: Date;
 }
 

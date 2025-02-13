@@ -1,5 +1,6 @@
 import { ExceptionFilter, Catch, ArgumentsHost, HttpException } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { ResponseDTO } from '../../utils/response.dto';
 
 @Catch(HttpException)
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -8,7 +9,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const status = exception.getStatus();
 
-    console.log('ccc', exception.getResponse());
+    console.log('Exception message: ', exception.getResponse());
 
     const exceptionResponse: any = exception.getResponse();
 
@@ -30,11 +31,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
       message = exceptionResponse || 'Hệ thống đang có lỗi. Vui bạn thử lại sau. ';
     }
 
-    console.log('zzz', message);
+    console.log('Error:', message);
 
-    response.status(status).json({
-      statusCode: status,
-      message: message,
-    });
+    response.status(status).send(new ResponseDTO(status, message));
   }
 }
