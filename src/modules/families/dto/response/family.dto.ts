@@ -15,7 +15,3 @@ export class FamilyDTO {
     return dto;
   }
 }
-
-export class FamilyResponse {
-  family: FamilyDTO;
-}

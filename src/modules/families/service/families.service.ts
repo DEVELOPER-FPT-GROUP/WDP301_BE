@@ -1,9 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { IFamiliesService } from './families.service.interface';
-import { FamilyDTO, FamilyResponse } from '../dto/response/family.dto';
+import { FamilyDTO } from '../dto/response/family.dto';
 import { Promise } from 'mongoose';
 import { CreateFamilyDto } from '../dto/request/create-family.dto';
 import { FamiliesRepository } from '../repository/families.repository';
+import { UpdateFamilyDto } from '../dto/request/update-family.dto';
 
 @Injectable()
 export class FamiliesService implements IFamiliesService {
@@ -11,27 +12,26 @@ export class FamiliesService implements IFamiliesService {
     private readonly familiesRepository: FamiliesRepository
   ) {
   }
-  async createFamily(createFamilyDto: CreateFamilyDto): Promise<FamilyResponse> {
+  async createFamily(createFamilyDto: CreateFamilyDto): Promise<FamilyDTO> {
     console.log("createFamilyDto: ", createFamilyDto);
     const createdFamily = await this.familiesRepository.create(createFamilyDto);
-    const familyDTO = FamilyDTO.map(createdFamily);
-    return { family: familyDTO };
+    return  FamilyDTO.map(createdFamily);
   }
 
-  async getFamilyById(id: string): Promise<FamilyResponse> {
+  async getFamilyById(id: string): Promise<FamilyDTO> {
     const family = await this.familiesRepository.findById(id);
     if (!family) {
       throw new NotFoundException('Family not found');
     }
-    return { family: FamilyDTO.map(family) };
+    return FamilyDTO.map(family);
   }
 
-  async updateFamily(id: string, updateData: Partial<CreateFamilyDto>): Promise<FamilyResponse> {
+  async updateFamily(id: string, updateData: Partial<UpdateFamilyDto>): Promise<FamilyDTO> {
     const updatedFamily = await this.familiesRepository.update(id, updateData);
     if (!updatedFamily) {
       throw new NotFoundException('Family not found');
     }
-    return { family: FamilyDTO.map(updatedFamily) };
+    return FamilyDTO.map(updatedFamily);
   }
 
   async deleteFamily(id: string): Promise<boolean> {

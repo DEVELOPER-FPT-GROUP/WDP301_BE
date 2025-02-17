@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { RelationshipTypesController } from '../relationship-types.controller';
-import { RelationshipTypesService } from '../relationship-types.service';
+import { RelationshipTypesController } from '../controller/relationship-types.controller';
+import { RelationshipTypesService } from '../service/relationship-types.service';
 
 describe('RelationshipTypesController', () => {
   let controller: RelationshipTypesController;
