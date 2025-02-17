@@ -36,4 +36,8 @@ export class MembersRepository {
   async findAll(): Promise<Member[]> {
     return this.memberModel.find().exec();
   }
+
+  async findMembersInFamily(familyId: string): Promise<Member[]> {
+    return this.memberModel.find({ familyId }).exec();
+  }
 }

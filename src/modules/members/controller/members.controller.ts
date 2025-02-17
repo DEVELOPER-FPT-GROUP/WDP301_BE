@@ -14,6 +14,7 @@ import { CreateMemberDto } from '../dto/request/create-member.dto';
 import { UpdateMemberDto } from '../dto/request/update-member.dto';
 import { MemberDTO } from '../dto/response/member.dto';
 import { ResponseDTO } from '../../../utils/response.dto';
+import { CreateSpouseDto } from '../dto/request/create-spouse.dto';
 
 @Controller('members')
 @UseInterceptors(ClassSerializerInterceptor) // Enable auto-serialization
@@ -51,5 +52,19 @@ export class MembersController {
   async remove(@Param('id') id: string): Promise<ResponseDTO<boolean>> {
     await this.membersService.deleteMember(id);
     return ResponseDTO.success(true, 'Member deleted successfully');
+  }
+
+  @Get('/family/:familyId')
+  async findMembersByFamilyId(
+    @Param('familyId') familyId: string,
+  ): Promise<ResponseDTO<MemberDTO[]>> {
+    const members = await this.membersService.findMembersInFamily(familyId);
+    return ResponseDTO.success(members, 'Members retrieved successfully');
+  }
+
+  @Post('/spouse')
+  async createSpouse(@Body() createSpouseDto: CreateSpouseDto): Promise<ResponseDTO<MemberDTO | null>> {
+    const result = await this.membersService.createSpouse(createSpouseDto);
+    return ResponseDTO.success(result, 'Spouse created successfully');
   }
 }

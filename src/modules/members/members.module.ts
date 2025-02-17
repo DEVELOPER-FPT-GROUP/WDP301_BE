@@ -4,13 +4,17 @@ import { MembersService } from './service/members.service';
 import { MembersController } from './controller/members.controller';
 import { Member, MemberSchema } from './schema/member.schema';
 import { MembersRepository } from './repository/members.repository';
+import { FamiliesModule } from '../families/families.module';
+import { MarriagesModule } from '../marriages/marriages.module';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: Member.name, schema: MemberSchema }]), // MongoDB integration
+    MongooseModule.forFeature([{ name: Member.name, schema: MemberSchema }]),
+    FamiliesModule,
+    MarriagesModule
   ],
   controllers: [MembersController],
-  providers: [MembersService, MembersRepository], // Register service and repository
-  exports: [MembersService, MembersRepository], // Allow usage in other modules
+  providers: [MembersService, MembersRepository],
+  exports: [MembersService, MembersRepository],
 })
 export class MembersModule {}

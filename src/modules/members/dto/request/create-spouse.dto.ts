@@ -1,9 +1,8 @@
-import { IsString, IsBoolean, IsOptional, IsNumber, IsEnum, IsNotEmpty, IsDateString } from 'class-validator';
-import { Gender } from '../../../../utils/enum';
+import { IsString, IsBoolean, IsOptional, IsNotEmpty, IsDateString } from 'class-validator';
 
-export class CreateMemberDto {
+export class CreateSpouseDto {
   @IsNotEmpty()
-  familyId: string;
+  memberId: string;
 
   @IsNotEmpty()
   firstName: string;
@@ -36,13 +35,6 @@ export class CreateMemberDto {
   isAlive?: boolean;
 
   @IsOptional()
-  @IsNumber()
-  generation?: number;
-
-  @IsOptional()
   @IsString()
   shortSummary?: string;
-
-  @IsEnum(Gender)
-  gender: Gender;
 }

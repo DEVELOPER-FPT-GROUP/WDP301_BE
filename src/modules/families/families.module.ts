@@ -10,6 +10,7 @@ import { FamiliesRepository } from './repository/families.repository';
     MongooseModule.forFeature([{ name: Family.name, schema: FamilySchema }]),
   ],
   controllers: [FamiliesController],
-  providers: [FamiliesService,  FamiliesRepository]
+  providers: [FamiliesService, FamiliesRepository],
+  exports: [FamiliesService, FamiliesRepository],
 })
 export class FamiliesModule {}
