@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
-import { FamilyHistoryRecordsService } from './family-history-records.service';
-import { FamilyHistoryRecordsController } from './family-history-records.controller';
+import { FamilyHistoryRecordsController } from './controller/family-history-records.controller';
+import { FamilyHistoryRecordsService } from './service/family-history-records.service';
+
 
 @Module({
   controllers: [FamilyHistoryRecordsController],

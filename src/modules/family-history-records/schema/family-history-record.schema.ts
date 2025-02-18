@@ -1,36 +1,36 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Schema as MongooseSchema } from 'mongoose';
 
-export type FamilyHistoricalRecordDocument = HydratedDocument<FamilyHistoricalRecord>;
+export type FamilyHistoryRecordDocument = HydratedDocument<FamilyHistoryRecord>;
 
-@Schema({ timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } })
-export class FamilyHistoricalRecord {
+@Schema({ timestamps: { createdAt: 'createdAt', updatedAt: 'updatedAt' } })
+export class FamilyHistoryRecord {
   @Prop({ type: MongooseSchema.Types.ObjectId, required: true, unique: true })
-  milestone_id: string; // Primary Key
+  historicalRecordId: string;
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Family', required: true })
-  family_id: string; // Foreign Key referencing Families
+  familyId: string;
 
   @Prop({ required: true })
-  milestone_title: string; // Title of the milestone
+  historicalRecordTitle: string;
 
   @Prop()
-  milestone_summary: string; // Brief summary of the milestone
+  historicalRecordSummary: string;
 
   @Prop()
-  milestone_details: string; // Detailed description of the milestone
+  historicalRecordDetails: string;
 
   @Prop({ type: Date, required: true })
-  start_date: Date; // Start date of the milestone
+  startDate: Date;
 
   @Prop({ type: Date })
-  end_date: Date; // End date of the milestone
+  endDate: Date; // Changed from end_date
 
   @Prop({ type: Date, default: Date.now })
-  created_at: Date; // Automatically generated creation timestamp
+  createdAt: Date; // Changed from created_at
 
   @Prop({ type: Date, default: Date.now })
-  updated_at: Date; // Automatically generated update timestamp
+  updatedAt: Date; // Changed from updated_at
 }
 
-export const FamilyHistoricalRecordSchema = SchemaFactory.createForClass(FamilyHistoricalRecord);
+export const FamilyHistoricalRecordSchema = SchemaFactory.createForClass(FamilyHistoryRecord);

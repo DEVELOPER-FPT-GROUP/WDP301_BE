@@ -7,7 +7,7 @@ import {
   Param,
   Delete,
   UseInterceptors,
-  ClassSerializerInterceptor
+  ClassSerializerInterceptor,
 } from '@nestjs/common';
 import { MembersService } from '../service/members.service';
 import { CreateMemberDto } from '../dto/request/create-member.dto';
@@ -22,7 +22,9 @@ export class MembersController {
   constructor(private readonly membersService: MembersService) {}
 
   @Post()
-  async create(@Body() createMemberDto: CreateMemberDto): Promise<ResponseDTO<MemberDTO>> {
+  async create(
+    @Body() createMemberDto: CreateMemberDto,
+  ): Promise<ResponseDTO<MemberDTO>> {
     const result = await this.membersService.createMember(createMemberDto);
     return ResponseDTO.success(result, 'Member created successfully');
   }
@@ -42,7 +44,7 @@ export class MembersController {
   @Patch(':id')
   async update(
     @Param('id') id: string,
-    @Body() updateMemberDto: UpdateMemberDto
+    @Body() updateMemberDto: UpdateMemberDto,
   ): Promise<ResponseDTO<MemberDTO>> {
     const result = await this.membersService.updateMember(id, updateMemberDto);
     return ResponseDTO.success(result, 'Member updated successfully');

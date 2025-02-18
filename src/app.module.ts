@@ -6,6 +6,7 @@ import { MembersModule } from './modules/members/members.module';
 import { MarriagesModule } from './modules/marriages/marriages.module';
 import { ParentChildRelationshipsModule } from './modules/parent-child-relationships/parent-child-relationships.module';
 import { RelationshipTypesModule } from './modules/relationship-types/relationship-types.module';
+import { EventsModule } from './modules/events/events.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { RelationshipTypesModule } from './modules/relationship-types/relationsh
     MarriagesModule,
     ParentChildRelationshipsModule,
     RelationshipTypesModule
+    EventsModule
   ],
 })
 export class AppModule {}
