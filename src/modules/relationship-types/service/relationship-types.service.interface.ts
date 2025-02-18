@@ -6,4 +6,5 @@ export interface IRelationshipTypesService {
   findAllRelationshipTypes(): Promise<RelationshipTypeDTO[]>;
   getRelationshipTypeById(id: string): Promise<RelationshipTypeDTO>;
   deleteRelationshipType(id: string): Promise<boolean>;
+  getRelationshipTypeByName(name: string): Promise<RelationshipTypeDTO>;
 }

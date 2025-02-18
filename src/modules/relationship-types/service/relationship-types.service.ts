@@ -3,6 +3,7 @@ import { IRelationshipTypesService } from './relationship-types.service.interfac
 import { CreateRelationshipTypeDto } from '../dto/request/create-relationship-type.dto';
 import { RelationshipTypeDTO } from '../dto/response/relationship-type.dto';
 import { RelationshipTypesRepository } from '../repository/relationship-types.repository';
+import { Promise } from 'mongoose';
 
 @Injectable()
 export class RelationshipTypesService implements IRelationshipTypesService {
@@ -32,5 +33,13 @@ export class RelationshipTypesService implements IRelationshipTypesService {
       throw new NotFoundException('Relationship Type not found');
     }
     return true;
+  }
+
+  async getRelationshipTypeByName(name: string): Promise<RelationshipTypeDTO> {
+    const type = await this.relationshipTypesRepo.findByName(name);
+    if (!type) {
+      throw new NotFoundException('Relationship Type not found');
+    }
+    return RelationshipTypeDTO.map(type);
   }
 }

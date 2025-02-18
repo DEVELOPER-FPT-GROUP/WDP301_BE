@@ -27,4 +27,8 @@ export class RelationshipTypesRepository {
     const result = await this.relationshipTypeModel.deleteOne({ _id: id }).exec();
     return result.deletedCount > 0;
   }
+
+  async findByName(name: string): Promise<RelationshipType | null> {
+    return this.relationshipTypeModel.findOne({ relaTypeName: name }).lean().exec();
+  }
 }

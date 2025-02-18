@@ -4,6 +4,7 @@ import { ParentChildRelationshipDTO } from '../dto/response/parent-child-relatio
 import { UpdateParentChildRelationshipDto } from '../dto/request/update-parent-child-relationship.dto';
 import { ParentChildRelationshipsRepository } from '../repository/parent-child-relationships.repository';
 import { IParentChildRelationshipsService } from './parent-child-relationships.service.interface';
+import { Promise } from 'mongoose';
 
 @Injectable()
 export class ParentChildRelationshipsService implements IParentChildRelationshipsService {
@@ -42,4 +43,23 @@ export class ParentChildRelationshipsService implements IParentChildRelationship
     }
     return true;
   }
+
+  findByChildIds(childIds: string[]): Promise<ParentChildRelationshipDTO[]> {
+    if (!childIds.length)
+      return Promise.resolve([]);
+
+    return this.parentChildRelationshipsRepository
+      .findByChildIds(childIds)
+      .then(relationships => relationships.map(relationship => ParentChildRelationshipDTO.map(relationship)));
+  }
+
+  findByParentIds(parentIds: string[]): Promise<ParentChildRelationshipDTO[]> {
+    if (!parentIds.length)
+      return Promise.resolve([]);
+
+    return this.parentChildRelationshipsRepository
+      .findByParentIds(parentIds)
+      .then(relationships => relationships.map(relationship => ParentChildRelationshipDTO.map(relationship)));
+  }
+
 }
