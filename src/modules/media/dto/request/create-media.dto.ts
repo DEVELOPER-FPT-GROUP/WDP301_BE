@@ -9,7 +9,7 @@ export class CreateMediaDto {
   // @IsEnum(['Event', 'Member'])
   // @IsNotEmpty()
   @IsOptional()
-  ownerType: 'Event' | 'Member';
+  ownerType: 'Event' | 'Member' | 'FamilyHistory' | 'Family';
 
   // @IsUrl()
   // @IsNotEmpty()

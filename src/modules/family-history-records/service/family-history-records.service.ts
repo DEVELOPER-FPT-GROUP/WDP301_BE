@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 
 
 import { IFamilyHistoryRecordService } from './family-history-records.service.interface';
@@ -8,18 +8,52 @@ import { CreateFamilyHistoryRecordDto } from '../dto/request/create-family-histo
 import { FamilyHistoryRecordMapper } from '../mapper/family-history-record.mapper';
 import { winstonLogger as logger } from 'src/common/winston-logger';
 import { UpdateFamilyHistoryRecordDto } from '../dto/request/update-family-history-record.dto';
+import { MediaService } from 'src/modules/media/serivce/media.service';
 
 @Injectable()
 export class FamilyHistoryRecordService implements IFamilyHistoryRecordService {
-  constructor(private readonly recordRepository: FamilyHistoryRecordRepository) {}
+  constructor(private readonly recordRepository: FamilyHistoryRecordRepository,
+    private readonly mediaService: MediaService,
+  ) {}
 
-  async createRecord(dto: CreateFamilyHistoryRecordDto): Promise<FamilyHistoryRecordResponseDto> {
+   /**
+   * 📌 Create a new family history record and upload multiple images
+   */
+   async createRecord(
+    dto: CreateFamilyHistoryRecordDto,
+    files?: Express.Multer.File[], //  multiple files
+  ): Promise<FamilyHistoryRecordResponseDto> {
     logger.http(`Received request to create family history record for Family ID: ${dto.familyId}`);
-    const entity = FamilyHistoryRecordMapper.toEntity(dto);
-    const record = await this.recordRepository.create(entity);
 
-    logger.info(`Family History Record created successfully with ID: ${record.historicalRecordId}`);
-    return FamilyHistoryRecordMapper.toResponseDto(record);
+    try {
+      let imageUrls: string[] = [];
+
+      // If files are uploaded, upload each file to Cloudinary
+      if (files && files.length > 0) {
+        const uploadPromises = files.map((file) =>
+          this.mediaService.uploadMedia(file, {
+            ownerId: dto.familyId,
+            ownerType: 'FamilyHistory',
+            url: '',
+            fileName: file.originalname,
+            mimeType: file.mimetype,
+            size: file.size
+          }).then((uploaded) => uploaded.url),
+        );
+
+        imageUrls = await Promise.all(uploadPromises);
+      }
+
+      const entity = FamilyHistoryRecordMapper.toEntity(dto);
+
+      const record = await this.recordRepository.create(entity);
+
+      logger.info(`✅ Family History Record created successfully with ID: ${record.historicalRecordId}`);
+      return FamilyHistoryRecordMapper.toResponseDto(record);
+    } catch (error) {
+      logger.error(`Error creating family history record: ${error.message}`);
+      throw new BadRequestException('Failed to create family history record');
+    }
   }
 
   async getAllRecords(): Promise<FamilyHistoryRecordResponseDto[]> {
