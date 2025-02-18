@@ -33,4 +33,14 @@ export class ParentChildRelationshipsRepository {
   async findAll(): Promise<ParentChildRelationship[]> {
     return this.parentChildModel.find().lean().exec();
   }
+
+  async findByChildIds(childIds: string[]): Promise<ParentChildRelationship[]> {
+    if (!childIds.length) return [];
+    return await this.parentChildModel.find({ childId: { $in: childIds } }).exec();
+  }
+
+  async findByParentIds(parentIds: string[]): Promise<ParentChildRelationship[]> {
+    if (!parentIds.length) return [];
+    return await this.parentChildModel.find({ parentId: { $in: parentIds } }).exec();
+  }
 }

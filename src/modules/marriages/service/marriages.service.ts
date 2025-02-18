@@ -45,6 +45,9 @@ export class MarriagesService implements IMarriagesService {
 
   async getSpouse(memberId: string): Promise<MarriageDTO> {
     const spouse = await this.marriagesRepository.getSpouse(memberId);
+    if (!spouse) {
+      throw new NotFoundException('Marriage record not found');
+    }
     return MarriageDTO.map(spouse);
   }
 

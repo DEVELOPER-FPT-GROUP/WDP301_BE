@@ -8,4 +8,6 @@ export interface IParentChildRelationshipsService {
   getRelationshipById(id: string): Promise<ParentChildRelationshipDTO>;
   updateRelationship(id: string, updateData: Partial<UpdateParentChildRelationshipDto>): Promise<ParentChildRelationshipDTO>;
   deleteRelationship(id: string): Promise<boolean>;
+  findByParentIds(parentIds: string[]): Promise<ParentChildRelationshipDTO[]>;
+  findByChildIds(childIds: string[]): Promise<ParentChildRelationshipDTO[]>;
 }

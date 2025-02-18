@@ -1,11 +1,11 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import mongoose, { HydratedDocument, Schema as MongooseSchema } from 'mongoose';
+import { HydratedDocument, Schema as MongooseSchema } from 'mongoose';
 
 export type MemberDocument = HydratedDocument<Member>;
 
 @Schema({ timestamps: true })
 export class Member {
-  _id: mongoose.Types.ObjectId;
+  _id: MongooseSchema.Types.ObjectId;
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Family'})
   familyId: MongooseSchema.Types.ObjectId;

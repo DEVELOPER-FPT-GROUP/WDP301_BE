@@ -1,9 +1,9 @@
 import { Member } from '../../schema/member.schema';
+import { ParentDTO } from './parent.dto';
+import { SpouseDTO } from './spouse.dto';
 
 export class MemberDTO {
   memberId: string;
-  wifeId?: string;
-  husbandId?: string;
   familyId: string;
   firstName: string;
   middleName?: string;
@@ -17,6 +17,9 @@ export class MemberDTO {
   shortSummary?: string;
   gender: string;
   createdAt: Date;
+  parent?: ParentDTO;
+  children?: string[];
+  spouse?: SpouseDTO;
 
   static map(member: Member): MemberDTO {
     const dto = new MemberDTO();
