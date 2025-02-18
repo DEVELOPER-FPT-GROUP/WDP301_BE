@@ -1,48 +1,80 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument } from 'mongoose';
+import { Document } from 'mongoose';
 
-export type EventDocument = HydratedDocument<Event>;
+export type EventDocument = Event & Document;
 
-@Schema({ timestamps: { createdAt: 'created_at', updatedAt: false } })
+@Schema({ timestamps: { createdAt: true, updatedAt: true } })
 export class Event {
-  @Prop({ required: true, unique: true })
-  event_id: string; // Primary Key
+  @Prop({ required: true, unique: true, index: true })
+  eventId: string;
 
   @Prop({ required: true })
-  created_by: string; // ID of the creator
+  createdBy: string;
 
   @Prop()
-  rela_type_name: string; // Relationship type name (optional)
+  eventScope: string;
 
   @Prop()
-  event_scope: string; // Scope of the event
-
-  @Prop()
-  event_type: string; // Type of the event
+  eventType: string;
 
   @Prop({ required: true })
-  event_name: string; // Name of the event
+  eventName: string;
 
   @Prop()
-  event_description: string; // Description of the event
+  eventDescription: string;
 
   @Prop({ type: Date })
-  gregorian_event_date: Date; // Gregorian event date
-
-  @Prop({ type: String })
-  lunar_event_date: string; // Lunar event date (string format)
-
-  @Prop()
-  recurrence_rule: string; // Recurrence rule (e.g., daily, weekly)
+  startDate: Date;
 
   @Prop({ type: Date })
-  end_recurrence_date: Date; // End date of recurrence
+  endDate: Date;
+
+  @Prop({ enum: ['none', 'daily', 'weekly', 'monthly', 'yearly'] })
+  recurrenceFrequency: string;
+
+  @Prop({ type: Number })
+  interval: number;
 
   @Prop()
-  location: string; // Location of the event
+  byDay: string;
 
-  @Prop({ type: Date, default: Date.now })
-  created_at: Date; // Creation timestamp
+  @Prop({ type: Number })
+  byMonthDay: number;
+
+  @Prop({ type: Date })
+  recurrenceEnd: Date;
+
+  @Prop()
+  location: string;
 }
 
 export const EventSchema = SchemaFactory.createForClass(Event);
+
+EventSchema.pre('validate', async function (next) {
+  if (!this.eventId) {
+    let isUnique = false;
+    let attempts = 0;
+
+    while (!isUnique && attempts < 5) { // Prevent infinite loops
+      const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      const randomPart = Math.floor(1000 + Math.random() * 9000);
+      const generatedEventId = `EVT-${timestamp}-${randomPart}`;
+
+      // Check if this eventId already exists in the database
+      const existingEvent = await (this.constructor as any).findOne({ eventId: generatedEventId });
+
+      if (!existingEvent) {
+        this.eventId = generatedEventId;
+        isUnique = true;
+      }
+
+      attempts++;
+    }
+
+    if (!isUnique) {
+      return next(new Error('Failed to generate a unique eventId after multiple attempts.'));
+    }
+  }
+
+  next();
+});
