@@ -57,7 +57,7 @@ export class MembersService implements IMembersService {
     return members.map(member => MemberDTO.map(member));
   }
 
-  async updateMember(id: string, updateData: Partial<UpdateMemberDto>): Promise<MemberDTO> {
+  async updateMember(id: string, updateData: UpdateMemberDto): Promise<MemberDTO> {
     const updatedMember = await this.membersRepository.update(id, updateData);
     if (!updatedMember) {
       throw new NotFoundException('Member not found');

@@ -18,7 +18,24 @@ async function bootstrap() {
 
   app.useGlobalFilters(new HttpExceptionFilter());
 
+  // Kích hoạt CORS với cấu hình mặc định
+  app.enableCors({
+    origin: (origin, callback) => {
+      const allowedOrigins = ['http://localhost:3000'];
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true, // Cho phép cookie và header xác thực
+  });
+
+
   const port = configService.get<number>("PORT") ?? 5000;
+
   await app.listen(port);
   console.log(`🚀 Application is running on: http://localhost:${port}`);
 }
