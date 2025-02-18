@@ -45,10 +45,10 @@ export class FamilyHistoryRecordService implements IFamilyHistoryRecordService {
   }
 
   async getRecordsByFamilyId(familyId: string): Promise<FamilyHistoryRecordResponseDto[]> {
-    logger.http(`Fetching history records for Family ID: ${familyId}`);
+    logger.http(`Fetching history records for Family ID: ${familyId}, sorted by start date`);
 
     const records = await this.recordRepository.findByFamilyId(familyId);
-    logger.info(`Fetched ${records.length} history records for Family ID: ${familyId}`);
+    logger.info(`Fetched ${records.length} sorted history records for Family ID: ${familyId}`);
 
     return records.map(FamilyHistoryRecordMapper.toResponseDto);
   }

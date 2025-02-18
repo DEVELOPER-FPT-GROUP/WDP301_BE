@@ -29,12 +29,11 @@ export class FamilyHistoryRecordRepository {
     return this.recordModel.findOne({ historicalRecordId: id }).exec();
   }
 
-  /**
-   * Finds historical records by Family ID
+   /**
+   * Finds historical records by Family ID (sorted by start date)
    */
-  async findByFamilyId(familyId: string): Promise<FamilyHistoryRecord[]> {
-    const objectId = new mongoose.Types.ObjectId(familyId);
-    return this.recordModel.find({ familyId: objectId }).exec();
+   async findByFamilyId(familyId: string): Promise<FamilyHistoryRecord[]> {
+    return this.recordModel.find({ familyId }).sort({ startDate: 1 }).exec(); // ✅ Sorted by `startDate`
   }
 
   /**
