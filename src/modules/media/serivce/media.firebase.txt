@@ -5,45 +5,46 @@ import { MediaRepository } from '../repository/media.repository';
 import { CreateMediaDto } from '../dto/request/create-media.dto';
 import { UpdateMediaDto } from '../dto/request/update-media.dto';
 import { winstonLogger as logger } from 'src/common/winston-logger';
-import { CloudinaryService } from 'src/modules/cloudinary/cloudinary.service';
+import { FirebaseStorageService } from 'src/modules/firebase/firebase.storge.service';
+
 
 @Injectable()
 export class MediaService {
   constructor(
     private readonly mediaRepository: MediaRepository,
-    private readonly cloudinaryService: CloudinaryService,
+    private readonly firebaseStorageService: FirebaseStorageService,
   ) {}
-
-  /**
-   * 📌 Upload media file to Cloudinary and save record in MongoDB
+    /**
+   * 📌 Upload media file to Firebase and save record in MongoDB
    */
-  async uploadMedia(file: Express.Multer.File, dto: CreateMediaDto): Promise<MediaResponseDto> {
-    logger.http(`Received request to upload media for owner ID: ${dto.ownerId}`);
-
-    if (!file) {
-      throw new BadRequestException('File is required');
-    }
-
-    try {
-      // 📤 Upload file to Cloudinary
-      const uploadResult = await this.cloudinaryService.uploadImage(file);
-      
-      // Save to MongoDB
-      const mediaEntity = MediaMapper.toEntity(dto);
-      mediaEntity.url = uploadResult.secure_url;
-      mediaEntity.fileName = file.originalname;
-      mediaEntity.mimeType = file.mimetype;
-      mediaEntity.size = file.size;
+    async uploadMedia(file: Express.Multer.File, dto: CreateMediaDto): Promise<MediaResponseDto> {
+      logger.http(`Received request to upload media for owner ID: ${dto.ownerId}`);
   
-      const media = await this.mediaRepository.create(mediaEntity);
-      logger.info(`Media uploaded successfully with ID: ${media.mediaId}`);
+      if (!file) {
+        throw new BadRequestException('File is required');
+      }
   
-      return MediaMapper.toResponseDto(media);
-    } catch (error) {
-      logger.error(`Error uploading file to Cloudinary: ${error.message}`);
-      throw new BadRequestException('Failed to upload file');
+      try {
+        // 📤 Upload file lên Firebase Storage
+        const url = await this.firebaseStorageService.uploadFile(file, 'media');
+  
+        // Lưu vào MongoDB
+        const mediaEntity = MediaMapper.toEntity(dto);
+        mediaEntity.url = url;
+        mediaEntity.fileName = file.originalname;
+        mediaEntity.mimeType = file.mimetype;
+        mediaEntity.size = file.size;
+  
+        const media = await this.mediaRepository.create(mediaEntity);
+        logger.info(`Media uploaded successfully with ID: ${media.mediaId}`);
+  
+        return MediaMapper.toResponseDto(media);
+      } catch (error) {
+        logger.error(`Error uploading file to Firebase: ${error.message}`);
+        throw new BadRequestException('Failed to upload file');
+      }
     }
-  }
+  
 
   /**
    * 📌 Get all media records
@@ -87,7 +88,10 @@ export class MediaService {
   }
 
   /**
-   * 📌 Delete media from Cloudinary and MongoDB
+   * 📌 Delete media from Firebase and MongoDB
+   */
+  /**
+   * 📌 Delete media from Firebase and MongoDB
    */
   async deleteMedia(id: string): Promise<MediaResponseDto> {
     logger.http(`Received request to delete media with ID: ${id}`);
@@ -99,19 +103,16 @@ export class MediaService {
     }
 
     try {
-      // Extract public_id from Cloudinary URL
-      const publicId = this.cloudinaryService.extractPublicId(media.url);
-      
-      // 🗑 Delete file from Cloudinary
-      await this.cloudinaryService.deleteImage(publicId);
+      // 🗑 Xóa file trên Firebase Storage
+      await this.firebaseStorageService.deleteFile(media.url);
 
-      // Delete record from MongoDB
+      // Xóa record khỏi MongoDB
       await this.mediaRepository.delete(id);
       
       logger.info(`Media deleted successfully with ID: ${id}`);
       return MediaMapper.toResponseDto(media);
     } catch (error) {
-      logger.error(`Error deleting file from Cloudinary: ${error.message}`);
+      logger.error(`Error deleting file from Firebase: ${error.message}`);
       throw new BadRequestException('Failed to delete media');
     }
   }

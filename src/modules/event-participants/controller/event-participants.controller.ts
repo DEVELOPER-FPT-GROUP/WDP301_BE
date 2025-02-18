@@ -1,7 +1,8 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
-import { EventParticipantsService } from './event-participants.service';
-import { CreateEventParticipantDto } from './dto/create-event-participant.dto';
-import { UpdateEventParticipantDto } from './dto/update-event-participant.dto';
+import { EventParticipantsService } from '../service/event-participants.service';
+import { CreateEventParticipantDto } from '../dto/request/create-event-participant.dto';
+import { UpdateEventParticipantDto } from '../dto/request/update-event-participant.dto';
+
 
 @Controller('event-participants')
 export class EventParticipantsController {

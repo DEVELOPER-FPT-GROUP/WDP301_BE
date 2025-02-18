@@ -9,6 +9,7 @@ import { RelationshipTypesModule } from './modules/relationship-types/relationsh
 import { EventsModule } from './modules/events/events.module';
 import { MediaModule } from './modules/media/media.module';
 import { FamilyHistoryRecordModule } from './modules/family-history-records/family-history-records.module';
+import { FirebaseModule } from './modules/firebase/firebase.module';
 
 
 @Module({
@@ -27,7 +28,8 @@ import { FamilyHistoryRecordModule } from './modules/family-history-records/fami
     RelationshipTypesModule,
     EventsModule,
     MediaModule,
-    FamilyHistoryRecordModule
+    FamilyHistoryRecordModule,
+    FirebaseModule
   ],
 })
 export class AppModule {}

@@ -33,6 +33,6 @@ export class EventsRepository {
     return result.deletedCount > 0;}
 
   async findAll(): Promise<Event[]> {
-    return this.eventModel.find().exec();
+    return this.eventModel.find().sort({ startDate: 1 }).exec();
   }
 }
