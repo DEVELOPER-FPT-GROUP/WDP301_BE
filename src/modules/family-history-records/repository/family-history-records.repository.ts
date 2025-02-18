@@ -1,39 +1,53 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import mongoose from 'mongoose';
 import { FamilyHistoryRecord, FamilyHistoryRecordDocument } from '../schema/family-history-record.schema';
-import { CreateFamilyHistoryRecordDto } from '../dto/request/create-family-history-record.dto';
-import { UpdateFamilyHistoryRecordDto } from '../dto/request/update-family-history-record.dto';
 
 @Injectable()
-export class FamilyHistoryRecordsRepository {
-  constructor(
-    @InjectModel(FamilyHistoryRecord.name) private familyHistoryRecordModel: Model<FamilyHistoryRecordDocument>
-  ) {}
+export class FamilyHistoryRecordRepository {
+  constructor(@InjectModel(FamilyHistoryRecord.name) private readonly recordModel: Model<FamilyHistoryRecordDocument>) {}
 
-  async findById(id: string): Promise<FamilyHistoryRecord | null> {
-    return this.familyHistoryRecordModel.findOne({ _id: id }).exec();
+  /**
+   * Creates a new Family History Record
+   */
+  async create(record: FamilyHistoryRecord): Promise<FamilyHistoryRecord> {
+    return new this.recordModel(record).save();
   }
 
-  async create(data: CreateFamilyHistoryRecordDto): Promise<FamilyHistoryRecord> {
-    const newRecord = new this.familyHistoryRecordModel(data);
-    return newRecord.save();
-  }
-
-  async update(id: string, updateData: UpdateFamilyHistoryRecordDto): Promise<FamilyHistoryRecord | null> {
-    return this.familyHistoryRecordModel.findOneAndUpdate(
-      { _id: id },
-      updateData,
-      { new: true },
-    ).exec();
-  }
-
-  async delete(id: string): Promise<boolean> {
-    const result = await this.familyHistoryRecordModel.deleteOne({ _id: id }).exec();
-    return result.deletedCount > 0;
-  }
-
+  /**
+   * Finds all historical records
+   */
   async findAll(): Promise<FamilyHistoryRecord[]> {
-    return this.familyHistoryRecordModel.find().exec();
+    return this.recordModel.find().exec();
+  }
+
+  /**
+   * Finds a historical record by ID
+   */
+  async findById(id: string): Promise<FamilyHistoryRecord | null> {
+    return this.recordModel.findOne({ historicalRecordId: id }).exec();
+  }
+
+  /**
+   * Finds historical records by Family ID
+   */
+  async findByFamilyId(familyId: string): Promise<FamilyHistoryRecord[]> {
+    const objectId = new mongoose.Types.ObjectId(familyId);
+    return this.recordModel.find({ familyId: objectId }).exec();
+  }
+
+  /**
+   * Updates a historical record by ID
+   */
+  async update(id: string, updateData: Partial<FamilyHistoryRecord>): Promise<FamilyHistoryRecord | null> {
+    return this.recordModel.findOneAndUpdate({ historicalRecordId: id }, updateData, { new: true }).exec();
+  }
+
+  /**
+   * Deletes a historical record by ID
+   */
+  async delete(id: string): Promise<FamilyHistoryRecord | null> {
+    return this.recordModel.findOneAndDelete({ historicalRecordId: id }).exec();
   }
 }

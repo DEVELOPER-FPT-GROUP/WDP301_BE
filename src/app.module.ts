@@ -7,6 +7,9 @@ import { MarriagesModule } from './modules/marriages/marriages.module';
 import { ParentChildRelationshipsModule } from './modules/parent-child-relationships/parent-child-relationships.module';
 import { RelationshipTypesModule } from './modules/relationship-types/relationship-types.module';
 import { EventsModule } from './modules/events/events.module';
+import { MediaModule } from './modules/media/media.module';
+import { FamilyHistoryRecordModule } from './modules/family-history-records/family-history-records.module';
+
 
 @Module({
   imports: [
@@ -21,8 +24,10 @@ import { EventsModule } from './modules/events/events.module';
     MembersModule,
     MarriagesModule,
     ParentChildRelationshipsModule,
-    RelationshipTypesModule
-    EventsModule
+    RelationshipTypesModule,
+    EventsModule,
+    MediaModule,
+    FamilyHistoryRecordModule
   ],
 })
 export class AppModule {}

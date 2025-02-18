@@ -15,9 +15,10 @@ import { UpdateMemberDto } from '../dto/request/update-member.dto';
 import { MemberDTO } from '../dto/response/member.dto';
 import { ResponseDTO } from '../../../utils/response.dto';
 import { CreateSpouseDto } from '../dto/request/create-spouse.dto';
+import { LoggingInterceptor } from 'src/common/interceptors/logging.interceptor';
 
 @Controller('members')
-@UseInterceptors(ClassSerializerInterceptor) // Enable auto-serialization
+@UseInterceptors(ClassSerializerInterceptor,LoggingInterceptor) // Enable auto-serialization
 export class MembersController {
   constructor(private readonly membersService: MembersService) {}
 
