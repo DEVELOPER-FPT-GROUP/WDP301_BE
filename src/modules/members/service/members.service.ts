@@ -426,29 +426,27 @@ export class MembersService implements IMembersService {
    */
   private async createParentMap(childRelations: ParentChildRelationshipDTO[]): Promise<Map<string, ParentDTO>> {
     const parentMap = new Map<string, ParentDTO>();
+    const relation = childRelations[0];
 
-    // Iterate over each parent-child relationship
-    for (const relation of childRelations) {
-      // Retrieve the spouse (other parent) of the given parent ID
-      const spouse = await this.marriagesService.getSpouse(relation.parentId);
-      if (!spouse) continue; // Skip if no spouse is found
+    // Retrieve the spouse (other parent) of the given parent ID
+    const spouse = await this.marriagesService.getSpouse(relation.parentId);
+    if(!spouse) return parentMap;
 
-      // Initialize a ParentDTO object if the child is not already in the map
-      if (!parentMap.has(relation.childId)) {
-        parentMap.set(relation.childId, new ParentDTO());
-      }
+    // Initialize a ParentDTO object if the child is not already in the map
+    if (!parentMap.has(relation.childId)) {
+      parentMap.set(relation.childId, new ParentDTO());
+    }
 
-      // Retrieve the existing ParentDTO for the child
-      const parentDTO = parentMap.get(relation.childId)!;
+    // Retrieve the existing ParentDTO for the child
+    const parentDTO = parentMap.get(relation.childId)!;
 
-      // Determine father and mother based on spouse data
-      if (spouse.wifeId) {
-        parentDTO.fatherId = spouse.husbandId; // Husband is the father
-        parentDTO.motherId = relation.parentId; // The given parent is the mother
-      } else if (spouse.husbandId) {
-        parentDTO.fatherId = relation.parentId; // The given parent is the father
-        parentDTO.motherId = spouse.wifeId; // Wife is the mother
-      }
+    // Determine father and mother based on spouse data
+    if (spouse.wifeId) {
+      parentDTO.fatherId = spouse.husbandId; // Husband is the father
+      parentDTO.motherId = relation.parentId; // The given parent is the mother
+    } else if (spouse.husbandId) {
+      parentDTO.fatherId = relation.parentId; // The given parent is the father
+      parentDTO.motherId = spouse.wifeId; // Wife is the mother
     }
 
     return parentMap;
