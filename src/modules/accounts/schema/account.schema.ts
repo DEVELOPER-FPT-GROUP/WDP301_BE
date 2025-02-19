@@ -1,19 +1,23 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument, Schema as MongooseSchema } from 'mongoose';
+import mongoose, { HydratedDocument } from 'mongoose';
+import { v4 as uuidv4 } from 'uuid';
 
 export type AccountDocument = HydratedDocument<Account>;
+
 @Schema({ timestamps: true })
 export class Account {
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Member' })
-  memberId: string;
+  _id: mongoose.Types.ObjectId;
 
-  @Prop({ required: true })
+  @Prop({ type: mongoose.Types.ObjectId, ref: 'Member' })
+  memberId: mongoose.Types.ObjectId;
+
+  @Prop()
   username: string;
 
-  @Prop({ required: true })
+  @Prop()
   passwordHash: string;
 
-  @Prop({ required: true })
+  @Prop()
   email: string;
 
   @Prop({ default: false })
@@ -21,6 +25,9 @@ export class Account {
 
   @Prop({ default: Date.now })
   createdAt: Date;
+
+  @Prop({ default: Date.now })
+  updatedAt: Date;
 }
 
 export const AccountSchema = SchemaFactory.createForClass(Account);
