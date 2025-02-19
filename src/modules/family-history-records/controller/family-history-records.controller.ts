@@ -25,15 +25,15 @@ export class FamilyHistoryRecordController {
     return ResponseDTO.success(result, 'Family History Record created successfully');
   }
 
-  /**
-   *  Get all Family History Records
-   */
-  @Get()
-  async getAllRecords(): Promise<ResponseDTO<FamilyHistoryRecordResponseDto[]>> {
-    logger.http(`Received GET request to fetch all family history records`);
-    const result = await this.recordService.getAllRecords();
-    return ResponseDTO.success(result, 'Family History Records fetched successfully');
-  }
+  // /**
+  //  *  Get all Family History Records
+  //  */
+  // @Get()
+  // async getAllRecords(): Promise<ResponseDTO<FamilyHistoryRecordResponseDto[]>> {
+  //   logger.http(`Received GET request to fetch all family history records`);
+  //   const result = await this.recordService.getAllRecords();
+  //   return ResponseDTO.success(result, 'Family History Records fetched successfully');
+  // }
 
   /**
    *  Get a Family History Record by ID
@@ -50,10 +50,12 @@ export class FamilyHistoryRecordController {
    */
   @Get('family/:familyId')
   async getRecordsByFamilyId(@Param('familyId') familyId: string): Promise<ResponseDTO<FamilyHistoryRecordResponseDto[]>> {
-    logger.http(`Received GET request to fetch history records for Family ID: ${familyId}`);
+    logger.http(`Received GET request to fetch sorted history records for Family ID: ${familyId}`);
     const result = await this.recordService.getRecordsByFamilyId(familyId);
-    return ResponseDTO.success(result, `Family History Records for Family ID ${familyId} retrieved successfully`);
-  }
+    return ResponseDTO.success(result, `Family History Records for Family ID ${familyId} fetched successfully`);
+
+}
+
 
   /**
    *  Update a Family History Record by ID

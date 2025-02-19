@@ -1,15 +1,16 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { FamilyHistoryRecordsService } from '../family-history-records.service';
+import { FamilyHistoryRecordService } from '../service/family-history-records.service';
+
 
 describe('FamilyHistoryRecordsService', () => {
-  let service: FamilyHistoryRecordsService;
+  let service: FamilyHistoryRecordService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [FamilyHistoryRecordsService],
+      providers: [FamilyHistoryRecordService],
     }).compile();
 
-    service = module.get<FamilyHistoryRecordsService>(FamilyHistoryRecordsService);
+    service = module.get<FamilyHistoryRecordService>(FamilyHistoryRecordService);
   });
 
   it('should be defined', () => {

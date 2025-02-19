@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { CreateEventParticipantDto } from './dto/create-event-participant.dto';
-import { UpdateEventParticipantDto } from './dto/update-event-participant.dto';
+import { CreateEventParticipantDto } from '../dto/request/create-event-participant.dto';
+import { UpdateEventParticipantDto } from '../dto/request/update-event-participant.dto';
+
 
 @Injectable()
 export class EventParticipantsService {

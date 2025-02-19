@@ -1,17 +1,18 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { FamilyHistoryRecordsController } from '../family-history-records.controller';
-import { FamilyHistoryRecordsService } from '../family-history-records.service';
+import { FamilyHistoryRecordController } from '../controller/family-history-records.controller';
+import { FamilyHistoryRecordService } from '../service/family-history-records.service';
+
 
 describe('FamilyHistoryRecordsController', () => {
-  let controller: FamilyHistoryRecordsController;
+  let controller: FamilyHistoryRecordController;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      controllers: [FamilyHistoryRecordsController],
-      providers: [FamilyHistoryRecordsService],
+      controllers: [FamilyHistoryRecordController],
+      providers: [FamilyHistoryRecordService],
     }).compile();
 
-    controller = module.get<FamilyHistoryRecordsController>(FamilyHistoryRecordsController);
+    controller = module.get<FamilyHistoryRecordController>(FamilyHistoryRecordController);
   });
 
   it('should be defined', () => {

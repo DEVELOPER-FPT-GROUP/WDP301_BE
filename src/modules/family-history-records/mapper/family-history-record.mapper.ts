@@ -3,6 +3,7 @@ import { FamilyHistoryRecord } from '../schema/family-history-record.schema';
 import { CreateFamilyHistoryRecordDto } from '../dto/request/create-family-history-record.dto';
 import { UpdateFamilyHistoryRecordDto } from '../dto/request/update-family-history-record.dto';
 import { FamilyHistoryRecordResponseDto } from '../dto/response/family-history-records.dto';
+import { MediaResponseDto } from 'src/modules/media/dto/response/media-response.dto';
 
 
 export class FamilyHistoryRecordMapper {
@@ -43,7 +44,10 @@ export class FamilyHistoryRecordMapper {
   /**
    * Converts Database Entity to Response DTO
    */
-  static toResponseDto(record: FamilyHistoryRecord): FamilyHistoryRecordResponseDto {
+  static toResponseDto(
+    record: FamilyHistoryRecord,
+    mediaList: MediaResponseDto[] = [] // Thêm tham số để nhận danh sách media
+): FamilyHistoryRecordResponseDto {
     return {
       historicalRecordId: record.historicalRecordId,
       familyId: record.familyId.toString(), // Convert ObjectId to string
@@ -54,6 +58,8 @@ export class FamilyHistoryRecordMapper {
       endDate: record.endDate,
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
+      base64Images: mediaList, 
     };
-  }
+}
+
 }

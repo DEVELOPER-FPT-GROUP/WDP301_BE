@@ -5,13 +5,15 @@ import { FamilyHistoryRecordResponseDto } from "../dto/response/family-history-r
 export interface IFamilyHistoryRecordService {
   createRecord(dto: CreateFamilyHistoryRecordDto): Promise<FamilyHistoryRecordResponseDto>;
 
-  getAllRecords(): Promise<FamilyHistoryRecordResponseDto[]>;
+  // getAllRecords(): Promise<FamilyHistoryRecordResponseDto[]>;
 
   getRecordById(id: string): Promise<FamilyHistoryRecordResponseDto>;
 
-  getRecordsByFamilyId(familyId: string): Promise<FamilyHistoryRecordResponseDto[]>;
+  getRecordsByFamilyId(familyId: string): Promise<FamilyHistoryRecordResponseDto[]>
 
   updateRecord(id: string, dto: UpdateFamilyHistoryRecordDto): Promise<FamilyHistoryRecordResponseDto>;
 
   deleteRecord(id: string): Promise<FamilyHistoryRecordResponseDto>;
+
+  
 }

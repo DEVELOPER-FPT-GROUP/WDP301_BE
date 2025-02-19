@@ -1,31 +1,41 @@
 import { IsEnum, IsMongoId, IsNotEmpty, IsNumber, IsOptional, IsString, IsUrl } from 'class-validator';
 
 export class CreateMediaDto {
-  @IsMongoId()
-  @IsNotEmpty()
+  // @IsMongoId()
+  // @IsNotEmpty()
+  @IsOptional()
   ownerId: string;
 
-  @IsEnum(['Event', 'Member'])
-  @IsNotEmpty()
-  ownerType: 'Event' | 'Member';
+  // @IsEnum(['Event', 'Member'])
+  // @IsNotEmpty()
+  @IsOptional()
+  ownerType: 'Event' | 'Member' | 'FamilyHistory' | 'Family';
 
-  @IsUrl()
-  @IsNotEmpty()
+  // @IsUrl()
+  // @IsNotEmpty()
+  @IsOptional()
   url: string;
 
-  @IsString()
-  @IsNotEmpty()
+  // @IsString()
+  // @IsNotEmpty()
+  @IsOptional()
   fileName: string;
 
+  // @IsOptional()
+  // @IsString()
   @IsOptional()
-  @IsString()
   caption?: string;
 
-  @IsString()
-  @IsNotEmpty()
+  // @IsString()
+  // @IsNotEmpty()
+  @IsOptional()
   mimeType: string;
 
-  @IsNumber()
-  @IsNotEmpty()
+  // @IsNumber()
+  // @IsNotEmpty()
+  @IsOptional()
   size: number;
+  
+  @IsOptional()
+  base64: string;
 }

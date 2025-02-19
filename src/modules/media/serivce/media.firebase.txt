@@ -5,65 +5,46 @@ import { MediaRepository } from '../repository/media.repository';
 import { CreateMediaDto } from '../dto/request/create-media.dto';
 import { UpdateMediaDto } from '../dto/request/update-media.dto';
 import { winstonLogger as logger } from 'src/common/winston-logger';
-import { CloudinaryService } from 'src/modules/cloudinary/cloudinary.service';
+import { FirebaseStorageService } from 'src/modules/firebase/firebase.storge.service';
+
 
 @Injectable()
 export class MediaService {
   constructor(
     private readonly mediaRepository: MediaRepository,
-    private readonly cloudinaryService: CloudinaryService,
+    private readonly firebaseStorageService: FirebaseStorageService,
   ) {}
-
-  /**
-   * Upload base64 media to Cloudinary and save record in MongoDB
+    /**
+   * 📌 Upload media file to Firebase and save record in MongoDB
    */
-  async uploadMedia(dto: CreateMediaDto): Promise<MediaResponseDto> {
-    if (!dto?.base64) {
-      throw new BadRequestException('Base64 string is required');
+    async uploadMedia(file: Express.Multer.File, dto: CreateMediaDto): Promise<MediaResponseDto> {
+      logger.http(`Received request to upload media for owner ID: ${dto.ownerId}`);
+  
+      if (!file) {
+        throw new BadRequestException('File is required');
+      }
+  
+      try {
+        // 📤 Upload file lên Firebase Storage
+        const url = await this.firebaseStorageService.uploadFile(file, 'media');
+  
+        // Lưu vào MongoDB
+        const mediaEntity = MediaMapper.toEntity(dto);
+        mediaEntity.url = url;
+        mediaEntity.fileName = file.originalname;
+        mediaEntity.mimeType = file.mimetype;
+        mediaEntity.size = file.size;
+  
+        const media = await this.mediaRepository.create(mediaEntity);
+        logger.info(`Media uploaded successfully with ID: ${media.mediaId}`);
+  
+        return MediaMapper.toResponseDto(media);
+      } catch (error) {
+        logger.error(`Error uploading file to Firebase: ${error.message}`);
+        throw new BadRequestException('Failed to upload file');
+      }
     }
-
-    try {
-      const uploadResult = await this.cloudinaryService.uploadBase64(dto.base64);
-
-      // Lưu metadata vào MongoDB
-      const mediaEntity = MediaMapper.toEntity(dto);
-      mediaEntity.url = uploadResult.secure_url;
-      mediaEntity.fileName = dto.fileName || `media_${Date.now()}.png`;
-      mediaEntity.mimeType = uploadResult.format || 'image/png';
-      mediaEntity.size = uploadResult.bytes || 0;
-
-      const media = await this.mediaRepository.create(mediaEntity);
-      return MediaMapper.toResponseDto(media);
-    } catch (error) {
-      throw new BadRequestException(`Failed to upload file: ${error.message}`);
-    }
-  }
-/**
- * 📌 Upload multiple base64 images and store metadata
- */
-async uploadMultipleMedia(dtoList: CreateMediaDto[]): Promise<MediaResponseDto[]> {
-  if (!dtoList || !Array.isArray(dtoList) || dtoList.length === 0) {
-      throw new BadRequestException('No media data provided');
-  }
-
-  try {
-      const uploadedMedia = await Promise.all(
-          dtoList.map(async (dto, index) => {
-              if (!dto.base64) {
-                  throw new BadRequestException(`Invalid base64 at index ${index}`);
-              }
-
-              return await this.uploadMedia(dto);
-          })
-      );
-
-      return uploadedMedia;
-  } catch (error) {
-      logger.error(`Failed to upload multiple media: ${error.message}`);
-      throw new BadRequestException(`Error uploading media: ${error.message}`);
-  }
-}
-
+  
 
   /**
    * 📌 Get all media records
@@ -107,7 +88,10 @@ async uploadMultipleMedia(dtoList: CreateMediaDto[]): Promise<MediaResponseDto[]
   }
 
   /**
-   * 📌 Delete media from Cloudinary and MongoDB
+   * 📌 Delete media from Firebase and MongoDB
+   */
+  /**
+   * 📌 Delete media from Firebase and MongoDB
    */
   async deleteMedia(id: string): Promise<MediaResponseDto> {
     logger.http(`Received request to delete media with ID: ${id}`);
@@ -119,27 +103,17 @@ async uploadMultipleMedia(dtoList: CreateMediaDto[]): Promise<MediaResponseDto[]
     }
 
     try {
-      // Extract public_id from Cloudinary URL
-      const publicId = this.cloudinaryService.extractPublicId(media.url);
-      
-      // 🗑 Delete file from Cloudinary
-      await this.cloudinaryService.deleteImage(publicId);
+      // 🗑 Xóa file trên Firebase Storage
+      await this.firebaseStorageService.deleteFile(media.url);
 
-      // Delete record from MongoDB
+      // Xóa record khỏi MongoDB
       await this.mediaRepository.delete(id);
       
       logger.info(`Media deleted successfully with ID: ${id}`);
       return MediaMapper.toResponseDto(media);
     } catch (error) {
-      logger.error(`Error deleting file from Cloudinary: ${error.message}`);
+      logger.error(`Error deleting file from Firebase: ${error.message}`);
       throw new BadRequestException('Failed to delete media');
     }
-  }
-  
-  async getMediaByOwners (ownerIds: string[], ownerType: 'Event' | 'Member' | 'FamilyHistory'): Promise<MediaResponseDto[]> {
-    logger.http(`Fetching media for owners: ${ownerIds.join(', ')}`);
-    const mediaList = await this.mediaRepository.findByOwners(ownerIds, ownerType);
-    logger.info(`Fetched ${mediaList.length} media for owners: ${ownerIds.join(', ')}`);
-    return mediaList.map(MediaMapper.toResponseDto);
   }
 }
