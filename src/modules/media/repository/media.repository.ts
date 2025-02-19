@@ -28,7 +28,7 @@ export class MediaRepository {
   }
 
   async delete(id: string): Promise<Media | null> {
-    return this.mediaModel.findByIdAndDelete(id).exec();
+    return this.mediaModel.findOneAndDelete({ mediaId: id }).exec();
   }
 
   async findByOwners(ownerIds: string[], ownerType: 'Event' | 'Member' | 'FamilyHistory'): Promise<Media[]> {
