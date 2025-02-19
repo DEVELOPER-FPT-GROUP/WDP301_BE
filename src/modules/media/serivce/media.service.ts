@@ -15,35 +15,55 @@ export class MediaService {
   ) {}
 
   /**
-   * 📌 Upload media file to Cloudinary and save record in MongoDB
+   * Upload base64 media to Cloudinary and save record in MongoDB
    */
-  async uploadMedia(file: Express.Multer.File, dto: CreateMediaDto): Promise<MediaResponseDto> {
-    logger.http(`Received request to upload media for owner ID: ${dto.ownerId}`);
-
-    if (!file) {
-      throw new BadRequestException('File is required');
+  async uploadMedia(dto: CreateMediaDto): Promise<MediaResponseDto> {
+    if (!dto?.base64) {
+      throw new BadRequestException('Base64 string is required');
     }
 
     try {
-      // 📤 Upload file to Cloudinary
-      const uploadResult = await this.cloudinaryService.uploadImage(file);
-      
-      // Save to MongoDB
+      const uploadResult = await this.cloudinaryService.uploadBase64(dto.base64);
+
+      // Lưu metadata vào MongoDB
       const mediaEntity = MediaMapper.toEntity(dto);
       mediaEntity.url = uploadResult.secure_url;
-      mediaEntity.fileName = file.originalname;
-      mediaEntity.mimeType = file.mimetype;
-      mediaEntity.size = file.size;
-  
+      mediaEntity.fileName = dto.fileName || `media_${Date.now()}.png`;
+      mediaEntity.mimeType = uploadResult.format || 'image/png';
+      mediaEntity.size = uploadResult.bytes || 0;
+
       const media = await this.mediaRepository.create(mediaEntity);
-      logger.info(`Media uploaded successfully with ID: ${media.mediaId}`);
-  
       return MediaMapper.toResponseDto(media);
     } catch (error) {
-      logger.error(`Error uploading file to Cloudinary: ${error.message}`);
-      throw new BadRequestException('Failed to upload file');
+      throw new BadRequestException(`Failed to upload file: ${error.message}`);
     }
   }
+/**
+ * 📌 Upload multiple base64 images and store metadata
+ */
+async uploadMultipleMedia(dtoList: CreateMediaDto[]): Promise<MediaResponseDto[]> {
+  if (!dtoList || !Array.isArray(dtoList) || dtoList.length === 0) {
+      throw new BadRequestException('No media data provided');
+  }
+
+  try {
+      const uploadedMedia = await Promise.all(
+          dtoList.map(async (dto, index) => {
+              if (!dto.base64) {
+                  throw new BadRequestException(`Invalid base64 at index ${index}`);
+              }
+
+              return await this.uploadMedia(dto);
+          })
+      );
+
+      return uploadedMedia;
+  } catch (error) {
+      logger.error(`Failed to upload multiple media: ${error.message}`);
+      throw new BadRequestException(`Error uploading media: ${error.message}`);
+  }
+}
+
 
   /**
    * 📌 Get all media records

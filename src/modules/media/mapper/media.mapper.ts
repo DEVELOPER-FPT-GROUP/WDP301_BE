@@ -1,4 +1,3 @@
-import mongoose from 'mongoose';
 import { Media } from '../schema/media.schema';
 import { MediaResponseDto } from '../dto/response/media-response.dto';
 import { CreateMediaDto } from '../dto/request/create-media.dto';
@@ -11,7 +10,7 @@ export class MediaMapper {
   static toEntity(dto: CreateMediaDto): Media {
     return {
       mediaId: `MED-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}-${uuidv4().slice(0, 8)}`, 
-      ownerId: new mongoose.Types.ObjectId(dto.ownerId), 
+      ownerId: dto.ownerId, 
       ownerType: dto.ownerType,
       url: dto.url,
       fileName: dto.fileName,

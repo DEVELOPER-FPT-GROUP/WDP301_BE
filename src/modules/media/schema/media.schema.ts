@@ -9,14 +9,12 @@ export class Media {
     @Prop({ required: true, unique: true, index: true })
     mediaId: string;
 
-    @Prop({ 
-        type: MongooseSchema.Types.ObjectId, 
-        refPath: 'ownerType', 
+    @Prop({
         required: true 
     })
-    ownerId: mongoose.Types.ObjectId;
+    ownerId: string;
 
-    @Prop({ required: true, enum: ['Event', 'Member'] })
+    @Prop({ required: true, enum: ['Event', 'Member', 'FamilyHistory', 'Family'] })
     ownerType: string;
 
     @Prop({ required: true })

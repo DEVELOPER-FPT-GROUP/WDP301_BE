@@ -7,11 +7,18 @@ import { MediaController } from './controller/media.controller';
 import { FirebaseModule } from '../firebase/firebase.module'; // ✅ Import FirebaseModule to use FirebaseStorageService
 import { CloudinaryProvider } from '../cloudinary/cloudinary.provider';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import { MulterModule } from '@nestjs/platform-express';
 
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: Media.name, schema: MediaSchema }]), // ✅ Register Mongoose schema
     // FirebaseModule
+    MulterModule.register({
+      limits: {
+        fileSize: 50 * 1024 * 1024, // ✅ Set file size limit to 10MB
+        files: 5, // ✅ Allow max 5 files per request
+      },
+    }),
   ],
   controllers: [MediaController], // ✅ Connect Controller
   providers: [MediaService, MediaRepository, CloudinaryProvider, CloudinaryService], // ✅ Register Service & Repository

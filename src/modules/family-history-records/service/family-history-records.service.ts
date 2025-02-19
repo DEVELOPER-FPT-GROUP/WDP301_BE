@@ -1,6 +1,4 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-
-
 import { IFamilyHistoryRecordService } from './family-history-records.service.interface';
 import { FamilyHistoryRecordRepository } from '../repository/family-history-records.repository';
 import { FamilyHistoryRecordResponseDto } from '../dto/response/family-history-records.dto';
@@ -9,52 +7,68 @@ import { FamilyHistoryRecordMapper } from '../mapper/family-history-record.mappe
 import { winstonLogger as logger } from 'src/common/winston-logger';
 import { UpdateFamilyHistoryRecordDto } from '../dto/request/update-family-history-record.dto';
 import { MediaService } from 'src/modules/media/serivce/media.service';
+import { CreateMediaDto } from 'src/modules/media/dto/request/create-media.dto';
 
 @Injectable()
 export class FamilyHistoryRecordService implements IFamilyHistoryRecordService {
-  constructor(private readonly recordRepository: FamilyHistoryRecordRepository,
+  constructor(
+    private readonly recordRepository: FamilyHistoryRecordRepository,
     private readonly mediaService: MediaService,
   ) {}
 
-   /**
-   * 📌 Create a new family history record and upload multiple images
+  /**
+   * 📌 Create a new family history record and upload multiple images as base64
    */
-   async createRecord(
-    dto: CreateFamilyHistoryRecordDto,
-    files?: Express.Multer.File[], //  multiple files
-  ): Promise<FamilyHistoryRecordResponseDto> {
+  async createRecord(dto: CreateFamilyHistoryRecordDto): Promise<FamilyHistoryRecordResponseDto> {
+    if (!dto) {
+        throw new BadRequestException('Request body is missing or invalid');
+    }
+
     logger.http(`Received request to create family history record for Family ID: ${dto.familyId}`);
 
-    try {
-      let imageUrls: string[] = [];
+    // Tạo bản ghi lịch sử
+    const historicalRecord = FamilyHistoryRecordMapper.toEntity(dto);
+    const savedRecord = await this.recordRepository.create(historicalRecord);
 
-      // If files are uploaded, upload each file to Cloudinary
-      if (files && files.length > 0) {
-        const uploadPromises = files.map((file) =>
-          this.mediaService.uploadMedia(file, {
-            ownerId: dto.familyId,
-            ownerType: 'FamilyHistory',
-            url: '',
-            fileName: file.originalname,
-            mimeType: file.mimetype,
-            size: file.size
-          }).then((uploaded) => uploaded.url),
-        );
-
-        imageUrls = await Promise.all(uploadPromises);
-      }
-
-      const entity = FamilyHistoryRecordMapper.toEntity(dto);
-
-      const record = await this.recordRepository.create(entity);
-
-      logger.info(`✅ Family History Record created successfully with ID: ${record.historicalRecordId}`);
-      return FamilyHistoryRecordMapper.toResponseDto(record);
-    } catch (error) {
-      logger.error(`Error creating family history record: ${error.message}`);
-      throw new BadRequestException('Failed to create family history record');
+    // Kiểm tra nếu base64Images chỉ chứa 1 ảnh dạng string
+    let base64Images: string[] = [];
+    if (typeof dto.base64Images === 'string') {
+        base64Images = [dto.base64Images];  // Chuyển thành mảng có 1 phần tử
+    } else if (Array.isArray(dto.base64Images)) {
+        base64Images = dto.base64Images;
     }
-  }
+
+    if (base64Images.length === 0) {
+        logger.warn(`No images provided for historical record ${savedRecord.historicalRecordId}`);
+        return FamilyHistoryRecordMapper.toResponseDto(savedRecord);
+    }
+
+    try {
+        const mediaDtoList: CreateMediaDto[] = base64Images.map((base64: string, index: number) => ({
+            ownerId: savedRecord.historicalRecordId,
+            ownerType: 'FamilyHistory',
+            base64,
+            fileName: `family_history_${Date.now()}_${index}.png`,
+            mimeType: 'image/png',
+            url: '',  // Initialize with empty string, will be set after upload
+            size: Buffer.from(base64, 'base64').length
+        }));
+
+        await this.mediaService.uploadMultipleMedia(mediaDtoList);
+
+    } catch (error) {
+        logger.error(`Error uploading media for record ID ${savedRecord.historicalRecordId}: ${error.message}`);
+        await this.recordRepository.delete(savedRecord.historicalRecordId);
+        throw new BadRequestException(`Failed to create historical record: ${error.message}`);
+    }
+
+    logger.info(`✅ Family History Record created successfully with ID: ${savedRecord.historicalRecordId}`);
+    return FamilyHistoryRecordMapper.toResponseDto(savedRecord);
+}
+
+
+
+
 
   async getAllRecords(): Promise<FamilyHistoryRecordResponseDto[]> {
     logger.http(`Fetching all family history records`);

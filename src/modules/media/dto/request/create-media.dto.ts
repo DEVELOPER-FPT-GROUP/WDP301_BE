@@ -35,4 +35,7 @@ export class CreateMediaDto {
   // @IsNotEmpty()
   @IsOptional()
   size: number;
+  
+  @IsOptional()
+  base64: string;
 }
