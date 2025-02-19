@@ -21,7 +21,7 @@ export class ParentChildRelationshipsRepository {
     return newRelationship.save();
   }
 
-  async update(id: string, updateData: Partial<UpdateParentChildRelationshipDto>): Promise<ParentChildRelationship | null> {
+  async update(id: string, updateData: UpdateParentChildRelationshipDto): Promise<ParentChildRelationship | null> {
     return this.parentChildModel.findByIdAndUpdate(id, updateData, { new: true }).lean().exec();
   }
 

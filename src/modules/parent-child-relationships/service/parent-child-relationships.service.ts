@@ -28,7 +28,7 @@ export class ParentChildRelationshipsService implements IParentChildRelationship
     return relationships.map(relationship => ParentChildRelationshipDTO.map(relationship));
   }
 
-  async updateRelationship(id: string, updateData: Partial<UpdateParentChildRelationshipDto>): Promise<ParentChildRelationshipDTO> {
+  async updateRelationship(id: string, updateData: UpdateParentChildRelationshipDto): Promise<ParentChildRelationshipDTO> {
     const updatedRelationship = await this.parentChildRelationshipsRepository.update(id, updateData);
     if (!updatedRelationship) {
       throw new NotFoundException('Relationship not found');

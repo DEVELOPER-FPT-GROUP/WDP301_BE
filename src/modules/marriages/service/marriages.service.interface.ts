@@ -6,7 +6,7 @@ export interface IMarriagesService {
   createMarriage(createMarriageDto: CreateMarriageDto): Promise<MarriageDTO>;
   findAllMarriages(): Promise<MarriageDTO[]>;
   getMarriageById(id: string): Promise<MarriageDTO>;
-  updateMarriage(id: string, updateData: Partial<UpdateMarriageDto  >): Promise<MarriageDTO>;
+  updateMarriage(id: string, updateData: UpdateMarriageDto): Promise<MarriageDTO>;
   deleteMarriage(id: string): Promise<boolean>;
   getSpouse(memberId: string): Promise<MarriageDTO>
   getAllSpouses(memberIds: string[]): Promise<MarriageDTO[]>

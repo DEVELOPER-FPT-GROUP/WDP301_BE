@@ -27,7 +27,7 @@ export class MarriagesService implements IMarriagesService {
     return marriages.map(marriage => MarriageDTO.map(marriage));
   }
 
-  async updateMarriage(id: string, updateData: Partial<UpdateMarriageDto>): Promise<MarriageDTO> {
+  async updateMarriage(id: string, updateData: UpdateMarriageDto): Promise<MarriageDTO> {
     const updatedMarriage = await this.marriagesRepository.update(id, updateData);
     if (!updatedMarriage) {
       throw new NotFoundException('Marriage record not found');
