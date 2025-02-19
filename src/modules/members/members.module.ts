@@ -8,6 +8,7 @@ import { FamiliesModule } from '../families/families.module';
 import { MarriagesModule } from '../marriages/marriages.module';
 import { ParentChildRelationshipsModule } from '../parent-child-relationships/parent-child-relationships.module';
 import { RelationshipTypesModule } from '../relationship-types/relationship-types.module';
+import { AccountsModule } from '../accounts/accounts.module';
 
 @Module({
   imports: [
@@ -15,7 +16,8 @@ import { RelationshipTypesModule } from '../relationship-types/relationship-type
     FamiliesModule,
     MarriagesModule,
     ParentChildRelationshipsModule,
-    RelationshipTypesModule
+    RelationshipTypesModule,
+    AccountsModule
   ],
   controllers: [MembersController],
   providers: [MembersService, MembersRepository],
