@@ -85,13 +85,18 @@ export class FamilyHistoryRecordService implements IFamilyHistoryRecordService {
 
     const record = await this.recordRepository.findById(id);
     if (!record) {
-      logger.warn(`Family History Record with ID: ${id} not found`);
-      throw new NotFoundException(`Family History Record with id ${id} not found`);
+        logger.warn(`Family History Record with ID: ${id} not found`);
+        throw new NotFoundException(`Family History Record with id ${id} not found`);
     }
 
-    logger.info(`Family History Record found with ID: ${id}`);
-    return FamilyHistoryRecordMapper.toResponseDto(record);
-  }
+    // 📌 Truy vấn tất cả media có `ownerId = id`
+    const mediaList = await this.mediaService.getMediaByOwners([id], 'FamilyHistory');
+
+    logger.info(`Family History Record found with ID: ${id} and ${mediaList.length} media files`);
+    
+    return FamilyHistoryRecordMapper.toResponseDto(record, mediaList);
+}
+
 
   async getRecordsByFamilyId(familyId: string): Promise<FamilyHistoryRecordResponseDto[]> {
     logger.http(`Fetching history records for Family ID: ${familyId}, sorted by start date`);
@@ -120,20 +125,73 @@ export class FamilyHistoryRecordService implements IFamilyHistoryRecordService {
 }
 
 
-  async updateRecord(id: string, dto: UpdateFamilyHistoryRecordDto): Promise<FamilyHistoryRecordResponseDto> {
+async updateRecord(id: string, dto: UpdateFamilyHistoryRecordDto): Promise<FamilyHistoryRecordResponseDto> {
     logger.http(`Received request to update family history record with ID: ${id}`);
 
+    // 📌 Kiểm tra xem record có tồn tại không
+    const existingRecord = await this.recordRepository.findById(id);
+    if (!existingRecord) {
+        logger.warn(`Family History Record with ID: ${id} not found for update`);
+        throw new NotFoundException(`Family History Record with id ${id} not found`);
+    }
+
+    let newMediaList: MediaResponseDto[] = [];
+
+    // 📌 Xóa ảnh theo danh sách `deleteImageIds` nếu có
+    if (dto.deleteImageIds && dto.deleteImageIds.length > 0) {
+        logger.info(`Deleting ${dto.deleteImageIds.length} images for Family History Record ID: ${id}`);
+        
+        try {
+            // 🔥 Chạy xóa song song để tăng tốc độ
+            await Promise.all(dto.deleteImageIds.map(imageId => this.mediaService.deleteMedia(imageId)));
+            logger.info(`✅ Successfully deleted ${dto.deleteImageIds.length} images`);
+        } catch (error) {
+            logger.error(`❌ Failed to delete some images: ${error.message}`);
+            throw new BadRequestException(`Failed to delete images: ${error.message}`);
+        }
+    }
+
+    // 📌 Nếu có ảnh mới, upload ảnh mới
+    if (dto.isChangeImage && dto.base64Images && dto.base64Images.length > 0) {
+        logger.info(`Uploading new images for Family History Record ID: ${id}`);
+
+        try {
+            const mediaDtoList: CreateMediaDto[] = dto.base64Images.map((base64, index) => ({
+                ownerId: id,
+                ownerType: 'FamilyHistory',
+                base64,
+                fileName: `family_history_${Date.now()}_${index}.png`,
+                mimeType: 'image/png',
+                url: '',
+                size: Buffer.from(base64, 'base64').length,
+            }));
+
+            newMediaList = await this.mediaService.uploadMultipleMedia(mediaDtoList);
+            logger.info(`✅ Uploaded ${newMediaList.length}/${dto.base64Images.length} new images`);
+        } catch (error) {
+            logger.error(`❌ Failed to upload new images: ${error.message}`);
+            throw new BadRequestException(`Failed to upload new images: ${error.message}`);
+        }
+    } else {
+        logger.info(`No new images uploaded for Family History Record ID: ${id}`);
+        newMediaList = await this.mediaService.getMediaByOwners([id], 'FamilyHistory');
+    }
+
+    // 📌 Cập nhật thông tin record
     const updateEntity = FamilyHistoryRecordMapper.toUpdateEntity(dto);
     const updatedRecord = await this.recordRepository.update(id, updateEntity);
 
     if (!updatedRecord) {
-      logger.warn(`Family History Record with ID: ${id} not found for update`);
-      throw new NotFoundException(`Family History Record with id ${id} not found`);
+        logger.warn(`Family History Record with ID: ${id} not found after update`);
+        throw new NotFoundException(`Family History Record with id ${id} not found`);
     }
 
-    logger.info(`Family History Record updated successfully with ID: ${id}`);
-    return FamilyHistoryRecordMapper.toResponseDto(updatedRecord);
-  }
+    logger.info(`✅ Family History Record updated successfully with ID: ${id}`);
+    
+    // 📌 Trả về record với danh sách ảnh (cũ hoặc mới)
+    return FamilyHistoryRecordMapper.toResponseDto(updatedRecord, newMediaList);
+}
+
 
   async deleteRecord(id: string): Promise<FamilyHistoryRecordResponseDto> {
     logger.http(`Received request to delete family history record with ID: ${id}`);

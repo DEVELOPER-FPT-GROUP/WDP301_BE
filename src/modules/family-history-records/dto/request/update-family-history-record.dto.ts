@@ -23,4 +23,13 @@ export class UpdateFamilyHistoryRecordDto {
     @Type(() => Date)
     @IsDate()
     endDate?: Date;
+
+    @IsOptional()
+    isChangeImage?: boolean;
+
+    @IsOptional()
+    deleteImageIds: string[];
+    
+    @IsOptional()
+    base64Images?: string[];
   }
