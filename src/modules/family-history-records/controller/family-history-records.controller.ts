@@ -25,15 +25,15 @@ export class FamilyHistoryRecordController {
     return ResponseDTO.success(result, 'Family History Record created successfully');
   }
 
-  /**
-   *  Get all Family History Records
-   */
-  @Get()
-  async getAllRecords(): Promise<ResponseDTO<FamilyHistoryRecordResponseDto[]>> {
-    logger.http(`Received GET request to fetch all family history records`);
-    const result = await this.recordService.getAllRecords();
-    return ResponseDTO.success(result, 'Family History Records fetched successfully');
-  }
+  // /**
+  //  *  Get all Family History Records
+  //  */
+  // @Get()
+  // async getAllRecords(): Promise<ResponseDTO<FamilyHistoryRecordResponseDto[]>> {
+  //   logger.http(`Received GET request to fetch all family history records`);
+  //   const result = await this.recordService.getAllRecords();
+  //   return ResponseDTO.success(result, 'Family History Records fetched successfully');
+  // }
 
   /**
    *  Get a Family History Record by ID

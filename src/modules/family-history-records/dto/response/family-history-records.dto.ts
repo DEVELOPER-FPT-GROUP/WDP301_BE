@@ -1,3 +1,5 @@
+import { MediaResponseDto } from "src/modules/media/dto/response/media-response.dto";
+
 export class FamilyHistoryRecordResponseDto {
     historicalRecordId: string;
     familyId: string;
@@ -8,5 +10,6 @@ export class FamilyHistoryRecordResponseDto {
     endDate?: Date;
     createdAt: Date;
     updatedAt: Date;
+    base64Images?: MediaResponseDto[]
   }
   

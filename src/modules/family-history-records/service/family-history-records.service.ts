@@ -8,6 +8,7 @@ import { winstonLogger as logger } from 'src/common/winston-logger';
 import { UpdateFamilyHistoryRecordDto } from '../dto/request/update-family-history-record.dto';
 import { MediaService } from 'src/modules/media/serivce/media.service';
 import { CreateMediaDto } from 'src/modules/media/dto/request/create-media.dto';
+import { MediaResponseDto } from 'src/modules/media/dto/response/media-response.dto';
 
 @Injectable()
 export class FamilyHistoryRecordService implements IFamilyHistoryRecordService {
@@ -70,14 +71,14 @@ export class FamilyHistoryRecordService implements IFamilyHistoryRecordService {
 
 
 
-  async getAllRecords(): Promise<FamilyHistoryRecordResponseDto[]> {
-    logger.http(`Fetching all family history records`);
+  // async getAllRecords(): Promise<FamilyHistoryRecordResponseDto[]> {
+  //   logger.http(`Fetching all family history records`);
     
-    const records = await this.recordRepository.findAll();
-    logger.info(`Fetched ${records.length} family history records`);
+  //   const records = await this.recordRepository.findAll();
+  //   logger.info(`Fetched ${records.length} family history records`);
 
-    return records.map(FamilyHistoryRecordMapper.toResponseDto);
-  }
+  //   return records.map(FamilyHistoryRecordMapper.toResponseDto);
+  // }
 
   async getRecordById(id: string): Promise<FamilyHistoryRecordResponseDto> {
     logger.http(`Fetching family history record with ID: ${id}`);
@@ -98,8 +99,26 @@ export class FamilyHistoryRecordService implements IFamilyHistoryRecordService {
     const records = await this.recordRepository.findByFamilyId(familyId);
     logger.info(`Fetched ${records.length} sorted history records for Family ID: ${familyId}`);
 
-    return records.map(FamilyHistoryRecordMapper.toResponseDto);
-  }
+    if (records.length === 0) return [];
+
+    // 📌 Lấy tất cả historicalRecordId từ danh sách records
+    const recordIds = records.map(record => record.historicalRecordId);
+
+    // 📌 Truy vấn tất cả media có `ownerId` thuộc `recordIds`
+    const mediaList = await this.mediaService.getMediaByOwners(recordIds, 'FamilyHistory');
+
+    // 📌 Gom nhóm media theo `ownerId`
+    const mediaGroupedByRecord = recordIds.reduce((acc, recordId) => {
+        acc[recordId] = mediaList.filter(media => media.ownerId === recordId);
+        return acc;
+    }, {} as Record<string, MediaResponseDto[]>);
+
+    // 📌 Map từng record với danh sách media tương ứng
+    return records.map(record => 
+        FamilyHistoryRecordMapper.toResponseDto(record, mediaGroupedByRecord[record.historicalRecordId] || [])
+    );
+}
+
 
   async updateRecord(id: string, dto: UpdateFamilyHistoryRecordDto): Promise<FamilyHistoryRecordResponseDto> {
     logger.http(`Received request to update family history record with ID: ${id}`);

@@ -135,4 +135,11 @@ async uploadMultipleMedia(dtoList: CreateMediaDto[]): Promise<MediaResponseDto[]
       throw new BadRequestException('Failed to delete media');
     }
   }
+  
+  async getMediaByOwners (ownerIds: string[], ownerType: 'Event' | 'Member' | 'FamilyHistory'): Promise<MediaResponseDto[]> {
+    logger.http(`Fetching media for owners: ${ownerIds.join(', ')}`);
+    const mediaList = await this.mediaRepository.findByOwners(ownerIds, ownerType);
+    logger.info(`Fetched ${mediaList.length} media for owners: ${ownerIds.join(', ')}`);
+    return mediaList.map(MediaMapper.toResponseDto);
+  }
 }

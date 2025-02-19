@@ -19,7 +19,7 @@ export class MediaRepository {
     return this.mediaModel.findOne({ mediaId: id }).exec();
   }
 
-  async findByOwner(ownerId: string, ownerType: 'Event' | 'Member'): Promise<Media[]> {
+  async findByOwner(ownerId: string, ownerType: 'Event' | 'Member' | 'FamilyHistory'): Promise<Media[]> {
     return this.mediaModel.find({ ownerId: ownerId, ownerType: ownerType }).exec();
   }
 
@@ -29,5 +29,9 @@ export class MediaRepository {
 
   async delete(id: string): Promise<Media | null> {
     return this.mediaModel.findByIdAndDelete(id).exec();
+  }
+
+  async findByOwners(ownerIds: string[], ownerType: 'Event' | 'Member' | 'FamilyHistory'): Promise<Media[]> {
+    return this.mediaModel.find({ ownerId: { $in: ownerIds }, ownerType: ownerType }).exec();
   }
 }
