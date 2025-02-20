@@ -53,16 +53,37 @@ export class MembersService implements IMembersService {
   }
 
   /**
-   * Retrieves a member by their unique ID.
+   * Retrieves a member by their unique ID, including spouse and parent details.
    * @param id - The unique identifier of the member.
-   * @returns The member DTO if found, otherwise throws a NotFoundException.
+   * @returns The member DTO with spouse and parent information.
    */
   async getMemberById(id: string): Promise<MemberDTO> {
     const member = await this.membersRepository.findById(id);
     if (!member) {
       throw new NotFoundException('Member not found');
     }
-    return MemberDTO.map(member);
+    // Convert member to DTO
+    const memberDTO = MemberDTO.map(member);
+
+    // Fetch spouse details
+    const spouse = await this.marriagesService.getSpouse(memberDTO.memberId);
+    if (spouse) {
+      memberDTO.spouse =
+        memberDTO.gender === Gender.MALE
+          ? { wifeId: spouse.wifeId }
+          : { husbandId: spouse.husbandId };
+    }
+
+    // Fetch parent-child relationships
+    const childRelations = await this.parentChildRelationshipsService.findByChildIds([memberDTO.memberId]);
+    const parentMap = await this.createParentMap(childRelations);
+
+    // Assign parent details if available
+    if (parentMap.has(memberDTO.memberId)) {
+      memberDTO.parent = parentMap.get(memberDTO.memberId);
+    }
+
+    return memberDTO;
   }
 
   /**
