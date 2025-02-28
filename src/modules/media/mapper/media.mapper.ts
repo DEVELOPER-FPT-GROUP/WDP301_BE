@@ -3,6 +3,15 @@ import { MediaResponseDto } from '../dto/response/media-response.dto';
 import { CreateMediaDto } from '../dto/request/create-media.dto';
 import { UpdateMediaDto } from '../dto/request/update-media.dto';
 import { v4 as uuidv4 } from 'uuid';
+// Interface để convert từ File sang Entity
+interface FileToEntityParams {
+  ownerId: string;
+  ownerType: 'Event' | 'Member' | 'FamilyHistory';
+  fileName: string;
+  mimeType: string;
+  size: number;
+  url: string;
+}
 export class MediaMapper {
   /**
    * Converts CreateMediaDto to Media entity for database storage
@@ -21,7 +30,21 @@ export class MediaMapper {
       updatedAt: new Date(),
     } as Media;
   }
-
+  /**
+     * Map file upload to Media entity
+     */
+  static toEntityFromFile(params: FileToEntityParams): Media {
+    const media = new Media();
+    media.ownerId = params.ownerId;
+    media.ownerType = params.ownerType;
+    media.url = params.url;
+    media.fileName = params.fileName;
+    media.mimeType = params.mimeType;
+    media.size = params.size;
+    media.createdAt = new Date();
+    media.updatedAt = new Date();
+    return media;
+  }
   /**
    * Converts UpdateMediaDto to a Partial<Media> for updating existing media.
    */

@@ -24,19 +24,19 @@ import { MediaService } from '../serivce/media.service';
 export class MediaController {
   constructor(private readonly mediaService: MediaService) {}
 
-   /**
-   * 📤 Upload Media File (Base64) & Save to Cloudinary
-   */
-   @Post('upload')
-   async uploadMedia(
-     @Body() createMediaDto: CreateMediaDto
-   ): Promise<ResponseDTO<MediaResponseDto>> {
-     if (!createMediaDto.base64) {
-       throw new BadRequestException('Base64 string is required for upload');
-     }
-     const result = await this.mediaService.uploadMedia(createMediaDto);
-     return ResponseDTO.success(result, 'Media uploaded successfully');
-   }
+  //  /**
+  //  * 📤 Upload Media File (Base64) & Save to Cloudinary
+  //  */
+  //  @Post('upload')
+  //  async uploadMedia(
+  //    @Body() createMediaDto: CreateMediaDto
+  //  ): Promise<ResponseDTO<MediaResponseDto>> {
+  //    if (!createMediaDto.base64) {
+  //      throw new BadRequestException('Base64 string is required for upload');
+  //    }
+  //    const result = await this.mediaService.uploadMedia(createMediaDto);
+  //    return ResponseDTO.success(result, 'Media uploaded successfully');
+  //  }
 
   /**
    * 📌 Get all media records
