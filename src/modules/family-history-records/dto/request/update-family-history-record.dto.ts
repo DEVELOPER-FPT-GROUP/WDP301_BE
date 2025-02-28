@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsDate } from 'class-validator';
+import { IsOptional, IsString, IsDate, IsBoolean } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class UpdateFamilyHistoryRecordDto {
@@ -25,11 +25,10 @@ export class UpdateFamilyHistoryRecordDto {
     endDate?: Date;
 
     @IsOptional()
+    @IsBoolean()
     isChangeImage?: boolean;
 
     @IsOptional()
     deleteImageIds: string[];
-    
-    @IsOptional()
-    base64Images?: string[];
+
   }

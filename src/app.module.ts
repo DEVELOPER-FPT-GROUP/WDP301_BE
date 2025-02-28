@@ -10,8 +10,9 @@ import { EventsModule } from './modules/events/events.module';
 import { MediaModule } from './modules/media/media.module';
 import { FamilyHistoryRecordModule } from './modules/family-history-records/family-history-records.module';
 import { AccountsModule } from './modules/accounts/accounts.module';
+import { MulterModule } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { AuthModule } from './modules/auth/auth.module';
-
 
 @Module({
   imports: [
@@ -22,6 +23,12 @@ import { AuthModule } from './modules/auth/auth.module';
     MongooseModule.forRoot(
       "mongodb://localhost:27017/genealogy"
     ),
+    MulterModule.register({
+      storage: memoryStorage(), // Lưu files trong memory trước khi upload lên Cloudinary
+      limits: {
+        fileSize: 10 * 1024 * 1024, // 10MB limit
+      },
+    }),
     FamiliesModule,
     MembersModule,
     MarriagesModule,

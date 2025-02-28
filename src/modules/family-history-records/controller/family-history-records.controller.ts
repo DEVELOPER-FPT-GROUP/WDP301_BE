@@ -1,5 +1,8 @@
 import { 
-  Controller, Get, Post, Put, Delete, Param, Body, UseInterceptors 
+  Controller, Get, Post, Put, Delete, Param, Body, UseInterceptors, 
+  UploadedFiles,
+  ParseFilePipeBuilder,
+  HttpStatus
 } from '@nestjs/common';
 import { LoggingInterceptor } from 'src/common/interceptors/logging.interceptor';
 
@@ -9,6 +12,8 @@ import { CreateFamilyHistoryRecordDto } from '../dto/request/create-family-histo
 import { FamilyHistoryRecordResponseDto } from '../dto/response/family-history-records.dto';
 import { UpdateFamilyHistoryRecordDto } from '../dto/request/update-family-history-record.dto';
 import { ResponseDTO } from 'src/utils/response.dto';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { MulterFile } from 'src/common/types/multer-file.type';
 
 @UseInterceptors(LoggingInterceptor) // ✅ Apply logging interceptor
 @Controller('family-history')
@@ -18,10 +23,32 @@ export class FamilyHistoryRecordController {
   /**
    *  Create a new Family History Record
    */
+  /**
+   * Create a new Family History Record with file uploads
+   */
   @Post()
-  async createRecord(@Body() dto: CreateFamilyHistoryRecordDto): Promise<ResponseDTO<FamilyHistoryRecordResponseDto>> {
+  @UseInterceptors(FileFieldsInterceptor([
+    { name: 'files', maxCount: 10 } // Cho phép tối đa 10 files
+  ]))
+  async createRecord(
+    @Body() dto: CreateFamilyHistoryRecordDto,
+    @UploadedFiles(
+      new ParseFilePipeBuilder()
+        // .addFileTypeValidator({
+        //   fileType: /(jpg|jpeg|png)$/,
+        // })
+        // .addMaxSizeValidator({
+        //   maxSize: 5 * 1024 * 1024 // 5MB
+        // })
+        .build({
+          errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+          fileIsRequired: false, // Files không bắt buộc
+        })
+    ) files: { files?: MulterFile[] }
+  ): Promise<ResponseDTO<FamilyHistoryRecordResponseDto>> {
     logger.http(`Received POST request to create a family history record for Family ID: ${dto.familyId}`);
-    const result = await this.recordService.createRecord(dto);
+    
+    const result = await this.recordService.createRecord(dto, files?.files || []);
     return ResponseDTO.success(result, 'Family History Record created successfully');
   }
 
@@ -57,19 +84,35 @@ export class FamilyHistoryRecordController {
 }
 
 
-  /**
-   *  Update a Family History Record by ID
+ /**
+   * Update a Family History Record by ID with file uploads
    */
-  @Put(':id')
-  async updateRecord(
-    @Param('id') id: string, 
-    @Body() dto: UpdateFamilyHistoryRecordDto
-  ): Promise<ResponseDTO<FamilyHistoryRecordResponseDto>> {
-    logger.http(`Received PUT request to update family history record with ID: ${id}`);
-    const result = await this.recordService.updateRecord(id, dto);
-    return ResponseDTO.success(result, `Family History Record with ID ${id} updated successfully`);
-
-  }
+ @Put(':id')
+ @UseInterceptors(FileFieldsInterceptor([
+   { name: 'files', maxCount: 10 } // Cho phép tối đa 10 files
+ ]))
+ async updateRecord(
+   @Param('id') id: string,
+   @Body() dto: UpdateFamilyHistoryRecordDto,
+   @UploadedFiles(
+     new ParseFilePipeBuilder()
+       .addFileTypeValidator({
+         fileType: /(jpg|jpeg|png)$/,
+       })
+       .addMaxSizeValidator({
+         maxSize: 5 * 1024 * 1024 // 5MB
+       })
+       .build({
+         errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+         fileIsRequired: false, // Files không bắt buộc
+       })
+   ) files: { files?: MulterFile[] }
+ ): Promise<ResponseDTO<FamilyHistoryRecordResponseDto>> {
+   logger.http(`Received PUT request to update family history record with ID: ${id}`);
+   
+   const result = await this.recordService.updateRecord(id, dto, files?.files || []);
+   return ResponseDTO.success(result, `Family History Record with ID ${id} updated successfully`);
+ }
 
   /**
    *  Delete a Family History Record by ID
