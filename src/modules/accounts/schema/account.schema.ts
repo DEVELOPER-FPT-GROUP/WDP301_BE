@@ -28,6 +28,9 @@ export class Account {
 
   @Prop({ default: Date.now })
   updatedAt: Date;
+
+  @Prop()
+  refreshToken: string;
 }
 
 export const AccountSchema = SchemaFactory.createForClass(Account);
