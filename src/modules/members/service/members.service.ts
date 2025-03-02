@@ -442,4 +442,30 @@ export class MembersService implements IMembersService {
 
     return parentMap;
   }
+
+  async createFamilyLeader(createMemberDto: CreateMemberDto): Promise<MemberDTO> {
+    console.log('Creating Family Leader:', createMemberDto);
+
+    const createdMember = await this.createMember(createMemberDto);
+    if (!createdMember) {
+      throw new Error('Failed to create family leader');
+    }
+
+    if (createdMember.isAlive) {
+      await this.createFamilyLeaderAccount(createdMember);
+    }
+
+    return createdMember;
+  }
+
+  private async createFamilyLeaderAccount(member: MemberDTO): Promise<void> {
+    const createAccountDto = Object.assign(new CreateAccountDto(), {
+      memberId: member.memberId,
+      username: DataUtils.generateUniqueUsername(member.firstName, member.middleName || '', member.lastName),
+      passwordHash: '123456',
+      isAdmin: true,
+    });
+
+    await this.accountsService.createAccount(createAccountDto);
+  }
 }

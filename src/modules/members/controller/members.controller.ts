@@ -7,7 +7,7 @@ import {
   Param,
   Delete,
   UseInterceptors,
-  ClassSerializerInterceptor,
+  ClassSerializerInterceptor, UseGuards,
 } from '@nestjs/common';
 import { MembersService } from '../service/members.service';
 import { CreateMemberDto } from '../dto/request/create-member.dto';
@@ -17,6 +17,7 @@ import { ResponseDTO } from '../../../utils/response.dto';
 import { CreateSpouseDto } from '../dto/request/create-spouse.dto';
 import { CreateChildDto } from '../dto/request/create-child.dto';
 import { LoggingInterceptor } from 'src/common/interceptors/logging.interceptor';
+import { JwtAuthGuard } from '../../auth/guard/jwt-auth.guard';
 
 @Controller('members')
 @UseInterceptors(ClassSerializerInterceptor,LoggingInterceptor) // Enable auto-serialization
@@ -58,6 +59,7 @@ export class MembersController {
     return ResponseDTO.success(true, 'Member deleted successfully');
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('/get-members-in-family/:familyId')
   async findMembersByFamilyId(
     @Param('familyId') familyId: string,
@@ -76,5 +78,11 @@ export class MembersController {
   async createChild(@Body() createChildDto: CreateChildDto): Promise<ResponseDTO<MemberDTO | null>> {
     const result = await this.membersService.createChild(createChildDto);
     return ResponseDTO.success(result, 'Child created successfully');
+  }
+
+  @Post('/create-family-leader')
+  async createFamilyLeader(@Body() createMemberDto: CreateMemberDto): Promise<ResponseDTO<MemberDTO>> {
+    const result = await this.membersService.createFamilyLeader(createMemberDto);
+    return ResponseDTO.success(result, 'Family leader created successfully');
   }
 }
