@@ -18,6 +18,8 @@ import { CreateSpouseDto } from '../dto/request/create-spouse.dto';
 import { CreateChildDto } from '../dto/request/create-child.dto';
 import { LoggingInterceptor } from 'src/common/interceptors/logging.interceptor';
 import { JwtAuthGuard } from '../../auth/guard/jwt-auth.guard';
+import { RolesGuard } from '../../auth/guard/roles.guard';
+import { Roles } from '../../auth/decorator/roles.decorator';
 
 @Controller('members')
 @UseInterceptors(ClassSerializerInterceptor,LoggingInterceptor) // Enable auto-serialization
@@ -60,6 +62,7 @@ export class MembersController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Roles('admin')
   @Get('/get-members-in-family/:familyId')
   async findMembersByFamilyId(
     @Param('familyId') familyId: string,

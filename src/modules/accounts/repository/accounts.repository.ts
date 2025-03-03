@@ -41,7 +41,7 @@ export class AccountsRepository {
    * @returns The account document or null if not found.
    */
   async findByMemberId(memberId: string): Promise<Account | null> {
-    return this.accountModel.findOne({ memberId }).exec();
+    return this.accountModel.findOne({ memberId: new mongoose.Types.ObjectId(memberId) }).exec();
   }
 
   /**
