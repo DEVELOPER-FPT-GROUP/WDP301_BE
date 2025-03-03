@@ -16,20 +16,20 @@ export class MembersRepository {
   }
 
   async create(data: CreateMemberDto): Promise<Member> {
-    const newFamily = new this.memberModel(data);
-    return newFamily.save();
+    const newMember = new this.memberModel(data);
+    return newMember.save();
   }
 
   async update(id: string, updateData: UpdateMemberDto): Promise<Member | null> {
     return this.memberModel.findOneAndUpdate(
       { _id: id },
       updateData,
-      { new: true },
+      { new: true }
     ).exec();
   }
 
   async delete(id: string): Promise<boolean> {
-    const result = await this.memberModel.deleteOne({ familyId: id }).exec();
+    const result = await this.memberModel.deleteOne({ _id: id }).exec();
     return result.deletedCount > 0;
   }
 
@@ -39,5 +39,23 @@ export class MembersRepository {
 
   async findMembersInFamily(familyId: string): Promise<Member[]> {
     return this.memberModel.find({ familyId }).exec();
+  }
+
+  /**
+   * Finds members with search filters and supports pagination.
+   * @param filters - The search criteria.
+   * @param page - The current page number.
+   * @param limit - The number of records per page.
+   * @returns An object containing the matching members and total count.
+   */
+  async findByFilters(filters: any, page: number, limit: number): Promise<{ members: Member[]; total: number }> {
+    const skip = (page - 1) * limit;
+
+    const [members, total] = await Promise.all([
+      this.memberModel.find(filters).skip(skip).limit(limit).exec(),
+      this.memberModel.countDocuments(filters).exec()
+    ]);
+
+    return { members, total };
   }
 }
