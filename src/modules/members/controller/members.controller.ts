@@ -8,6 +8,8 @@ import {
   Delete,
   UseInterceptors,
   ClassSerializerInterceptor, UseGuards,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
 import { MembersService } from '../service/members.service';
 import { CreateMemberDto } from '../dto/request/create-member.dto';
@@ -18,11 +20,16 @@ import { CreateSpouseDto } from '../dto/request/create-spouse.dto';
 import { CreateChildDto } from '../dto/request/create-child.dto';
 import { LoggingInterceptor } from 'src/common/interceptors/logging.interceptor';
 import { JwtAuthGuard } from '../../auth/guard/jwt-auth.guard';
+import { RolesGuard } from '../../auth/guard/roles.guard';
+import { Roles } from '../../auth/decorator/roles.decorator';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { MulterFile } from 'src/common/types/multer-file.type';
+import { FaceDetectionService } from 'src/modules/ai-face-detection/service/face-detection.service';
 
 @Controller('members')
 @UseInterceptors(ClassSerializerInterceptor,LoggingInterceptor) // Enable auto-serialization
 export class MembersController {
-  constructor(private readonly membersService: MembersService) {}
+  constructor(private readonly membersService: MembersService,private readonly faceDetectionService: FaceDetectionService) {}
 
   @Post()
   async create(
@@ -84,5 +91,18 @@ export class MembersController {
   async createFamilyLeader(@Body() createMemberDto: CreateMemberDto): Promise<ResponseDTO<MemberDTO>> {
     const result = await this.membersService.createFamilyLeader(createMemberDto);
     return ResponseDTO.success(result, 'Family leader created successfully');
+  }
+
+  @Post('avatar')
+  @UseInterceptors(FileInterceptor('file'))
+  async testFaceDetection(@UploadedFile() file: MulterFile) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+
+    // Perform face detection
+    const result = await this.faceDetectionService.detectAndCropFace(file);
+
+    return result;
   }
 }
