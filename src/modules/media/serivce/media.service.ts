@@ -57,14 +57,28 @@ async uploadMultipleFiles(
   }
 
   try {
-    // Upload files song song để tăng tốc độ
-    const uploadedMedia = await Promise.all(
-      files.map(async (file) => {
-        return await this.uploadFile(file, ownerId, ownerType);
-      })
+    // Upload tất cả file lên Cloudinary song song
+    const uploadResults = await Promise.all(
+      files.map(file => this.cloudinaryService.uploadFile(file))
     );
 
-    return uploadedMedia;
+    // Tạo danh sách media entity từ kết quả upload
+    const mediaEntities = uploadResults.map((result, index) => {
+      const file = files[index];
+      return MediaMapper.toEntityFromFile({
+        ownerId,
+        ownerType,
+        fileName: file.originalname,
+        mimeType: file.mimetype,
+        size: file.size,
+        url: result.secure_url
+      });
+    });
+
+    // Lưu tất cả media entity vào MongoDB bằng một lệnh insertMany
+    const mediaList = await this.mediaRepository.createMany(mediaEntities);
+
+    return mediaList.map(MediaMapper.toResponseDto);
   } catch (error) {
     logger.error(`Failed to upload multiple files: ${error.message}`);
     throw new BadRequestException(`Error uploading files: ${error.message}`);

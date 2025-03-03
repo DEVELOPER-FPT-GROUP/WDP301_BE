@@ -34,4 +34,12 @@ export class MediaRepository {
   async findByOwners(ownerIds: string[], ownerType: 'Event' | 'Member' | 'FamilyHistory'): Promise<Media[]> {
     return this.mediaModel.find({ ownerId: { $in: ownerIds }, ownerType: ownerType }).exec();
   }
+
+  async createMany(mediaEntities: Media[]): Promise<Media[]> {
+    const result = await this.mediaModel.insertMany(mediaEntities);
+    return mediaEntities.map((entity, index) => ({
+      ...entity,
+      _id: result[index]._id,
+    }));
+  }
 }
