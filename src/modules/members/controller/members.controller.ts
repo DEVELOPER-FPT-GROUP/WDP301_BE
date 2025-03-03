@@ -20,6 +20,8 @@ import { LoggingInterceptor } from 'src/common/interceptors/logging.interceptor'
 import { JwtAuthGuard } from '../../auth/guard/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guard/roles.guard';
 import { Roles } from '../../auth/decorator/roles.decorator';
+import { PaginationDTO } from '../../../utils/pagination.dto';
+import { SearchMemberDto } from '../dto/request/search-member.dto';
 
 @Controller('members')
 @UseInterceptors(ClassSerializerInterceptor,LoggingInterceptor) // Enable auto-serialization
@@ -61,8 +63,8 @@ export class MembersController {
     return ResponseDTO.success(true, 'Member deleted successfully');
   }
 
-  @UseGuards(JwtAuthGuard)
-  @Roles('admin')
+  // @UseGuards(JwtAuthGuard)
+  // @Roles('admin')
   @Get('/get-members-in-family/:familyId')
   async findMembersByFamilyId(
     @Param('familyId') familyId: string,
@@ -87,5 +89,17 @@ export class MembersController {
   async createFamilyLeader(@Body() createMemberDto: CreateMemberDto): Promise<ResponseDTO<MemberDTO>> {
     const result = await this.membersService.createFamilyLeader(createMemberDto);
     return ResponseDTO.success(result, 'Family leader created successfully');
+  }
+
+  @Get('/get-member-details/:id')
+  async getMemberDetails(@Param('id') id: string): Promise<ResponseDTO<MemberDTO>> {
+    const result = await this.membersService.getMemberDetails(id);
+    return ResponseDTO.success(result, 'Member retrieved successfully');
+  }
+
+  @Post('/search')
+  async searchMembers(@Body() searchDto: SearchMemberDto): Promise<ResponseDTO<PaginationDTO<MemberDTO>>> {
+    const result = await this.membersService.searchMembers(searchDto);
+    return ResponseDTO.success(result, 'Members retrieved successfully');
   }
 }
