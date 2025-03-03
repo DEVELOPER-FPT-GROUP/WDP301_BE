@@ -4,24 +4,27 @@ import { MulterFile } from 'src/common/types/multer-file.type';
 
 @Injectable()
 export class CloudinaryService {
-  /**
-   * 📌 Uploads an image to Cloudinary and returns the upload response
+    /**
+   * 📌 Uploads a file to Cloudinary and returns the upload response
    */
-  async uploadImage(file: MulterFile): Promise<UploadApiResponse> {
-    return new Promise((resolve, reject) => {
-      const uploadStream = cloudinary.uploader.upload_stream(
-        { folder: 'uploads' },
-        (error, result) => {
-          if (error || !result) {
-            return reject(new Error(`Cloudinary upload failed: ${error?.message || 'Unknown error'}`));
+    async uploadFile(file: MulterFile): Promise<UploadApiResponse> {
+      return new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          { 
+            folder: 'uploads',
+            resource_type: 'auto' // Tự động phát hiện loại file
+          },
+          (error, result) => {
+            if (error || !result) {
+              return reject(new Error(`Cloudinary upload failed: ${error?.message || 'Unknown error'}`));
+            }
+            resolve(result);
           }
-          resolve(result);
-        }
-      );
-      uploadStream.end(file.buffer);
-    });
-  }
-
+        );
+        uploadStream.end(file.buffer);
+      });
+    }
+  
   /**
    * 📌 Deletes an image from Cloudinary using its public ID
    */

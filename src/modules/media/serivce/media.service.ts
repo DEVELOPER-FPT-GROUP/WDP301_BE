@@ -6,6 +6,7 @@ import { CreateMediaDto } from '../dto/request/create-media.dto';
 import { UpdateMediaDto } from '../dto/request/update-media.dto';
 import { winstonLogger as logger } from 'src/common/winston-logger';
 import { CloudinaryService } from 'src/modules/cloudinary/cloudinary.service';
+import { MulterFile } from 'src/common/types/multer-file.type';
 
 @Injectable()
 export class MediaService {
@@ -14,56 +15,75 @@ export class MediaService {
     private readonly cloudinaryService: CloudinaryService,
   ) {}
 
-  /**
-   * Upload base64 media to Cloudinary and save record in MongoDB
+ /**
+   * Upload file to Cloudinary and save record in MongoDB
    */
-  async uploadMedia(dto: CreateMediaDto): Promise<MediaResponseDto> {
-    if (!dto?.base64) {
-      throw new BadRequestException('Base64 string is required');
-    }
-
-    try {
-      const uploadResult = await this.cloudinaryService.uploadBase64(dto.base64);
-
-      // Lưu metadata vào MongoDB
-      const mediaEntity = MediaMapper.toEntity(dto);
-      mediaEntity.url = uploadResult.secure_url;
-      mediaEntity.fileName = dto.fileName || `media_${Date.now()}.png`;
-      mediaEntity.mimeType = uploadResult.format || 'image/png';
-      mediaEntity.size = uploadResult.bytes || 0;
-
-      const media = await this.mediaRepository.create(mediaEntity);
-      return MediaMapper.toResponseDto(media);
-    } catch (error) {
-      throw new BadRequestException(`Failed to upload file: ${error.message}`);
-    }
-  }
-/**
- * 📌 Upload multiple base64 images and store metadata
- */
-async uploadMultipleMedia(dtoList: CreateMediaDto[]): Promise<MediaResponseDto[]> {
-  if (!dtoList || !Array.isArray(dtoList) || dtoList.length === 0) {
-      throw new BadRequestException('No media data provided');
+ async uploadFile(file: MulterFile, ownerId: string, ownerType: 'Event' | 'Member' | 'FamilyHistory'): Promise<MediaResponseDto> {
+  if (!file) {
+    throw new BadRequestException('File is required');
   }
 
   try {
-      const uploadedMedia = await Promise.all(
-          dtoList.map(async (dto, index) => {
-              if (!dto.base64) {
-                  throw new BadRequestException(`Invalid base64 at index ${index}`);
-              }
+    // Upload file to Cloudinary
+    const uploadResult = await this.cloudinaryService.uploadFile(file);
 
-              return await this.uploadMedia(dto);
-          })
-      );
+    // Lưu metadata vào MongoDB
+    const mediaEntity = MediaMapper.toEntityFromFile({
+      ownerId,
+      ownerType,
+      fileName: file.originalname,
+      mimeType: file.mimetype,
+      size: file.size,
+      url: uploadResult.secure_url
+    });
 
-      return uploadedMedia;
+    const media = await this.mediaRepository.create(mediaEntity);
+    return MediaMapper.toResponseDto(media);
   } catch (error) {
-      logger.error(`Failed to upload multiple media: ${error.message}`);
-      throw new BadRequestException(`Error uploading media: ${error.message}`);
+    throw new BadRequestException(`Failed to upload file: ${error.message}`);
   }
 }
 
+/**
+ * Upload multiple files and store metadata
+ */
+async uploadMultipleFiles(
+  files: MulterFile[], 
+  ownerId: string, 
+  ownerType: 'Event' | 'Member' | 'FamilyHistory'
+): Promise<MediaResponseDto[]> {
+  if (!files || !Array.isArray(files) || files.length === 0) {
+    throw new BadRequestException('No files provided');
+  }
+
+  try {
+    // Upload tất cả file lên Cloudinary song song
+    const uploadResults = await Promise.all(
+      files.map(file => this.cloudinaryService.uploadFile(file))
+    );
+
+    // Tạo danh sách media entity từ kết quả upload
+    const mediaEntities = uploadResults.map((result, index) => {
+      const file = files[index];
+      return MediaMapper.toEntityFromFile({
+        ownerId,
+        ownerType,
+        fileName: file.originalname,
+        mimeType: file.mimetype,
+        size: file.size,
+        url: result.secure_url
+      });
+    });
+
+    // Lưu tất cả media entity vào MongoDB bằng một lệnh insertMany
+    const mediaList = await this.mediaRepository.createMany(mediaEntities);
+
+    return mediaList.map(MediaMapper.toResponseDto);
+  } catch (error) {
+    logger.error(`Failed to upload multiple files: ${error.message}`);
+    throw new BadRequestException(`Error uploading files: ${error.message}`);
+  }
+}
 
   /**
    * 📌 Get all media records

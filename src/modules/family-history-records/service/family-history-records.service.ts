@@ -9,6 +9,7 @@ import { UpdateFamilyHistoryRecordDto } from '../dto/request/update-family-histo
 import { MediaService } from 'src/modules/media/serivce/media.service';
 import { CreateMediaDto } from 'src/modules/media/dto/request/create-media.dto';
 import { MediaResponseDto } from 'src/modules/media/dto/response/media-response.dto';
+import { MulterFile } from 'src/common/types/multer-file.type';
 
 @Injectable()
 export class FamilyHistoryRecordService implements IFamilyHistoryRecordService {
@@ -17,12 +18,12 @@ export class FamilyHistoryRecordService implements IFamilyHistoryRecordService {
     private readonly mediaService: MediaService,
   ) {}
 
-  /**
-   * 📌 Create a new family history record and upload multiple images as base64
+ /**
+   * 📌 Create a new family history record and upload multiple files
    */
-  async createRecord(dto: CreateFamilyHistoryRecordDto): Promise<FamilyHistoryRecordResponseDto> {
+ async createRecord(dto: CreateFamilyHistoryRecordDto, files: MulterFile[]): Promise<FamilyHistoryRecordResponseDto> {
     if (!dto) {
-        throw new BadRequestException('Request body is missing or invalid');
+      throw new BadRequestException('Request body is missing or invalid');
     }
 
     logger.http(`Received request to create family history record for Family ID: ${dto.familyId}`);
@@ -31,41 +32,30 @@ export class FamilyHistoryRecordService implements IFamilyHistoryRecordService {
     const historicalRecord = FamilyHistoryRecordMapper.toEntity(dto);
     const savedRecord = await this.recordRepository.create(historicalRecord);
 
-    // Kiểm tra nếu base64Images chỉ chứa 1 ảnh dạng string
-    let base64Images: string[] = [];
-    if (typeof dto.base64Images === 'string') {
-        base64Images = [dto.base64Images];  // Chuyển thành mảng có 1 phần tử
-    } else if (Array.isArray(dto.base64Images)) {
-        base64Images = dto.base64Images;
-    }
-
-    if (base64Images.length === 0) {
-        logger.warn(`No images provided for historical record ${savedRecord.historicalRecordId}`);
-        return FamilyHistoryRecordMapper.toResponseDto(savedRecord);
-    }
-
-    try {
-        const mediaDtoList: CreateMediaDto[] = base64Images.map((base64: string, index: number) => ({
-            ownerId: savedRecord.historicalRecordId,
-            ownerType: 'FamilyHistory',
-            base64,
-            fileName: `family_history_${Date.now()}_${index}.png`,
-            mimeType: 'image/png',
-            url: '',  // Initialize with empty string, will be set after upload
-            size: Buffer.from(base64, 'base64').length
-        }));
-
-        await this.mediaService.uploadMultipleMedia(mediaDtoList);
-
-    } catch (error) {
-        logger.error(`Error uploading media for record ID ${savedRecord.historicalRecordId}: ${error.message}`);
+    // Xử lý file uploads nếu có
+    let mediaList: MediaResponseDto[] = [];
+    if (files && files.length > 0) {
+      try {
+        // Upload files to Cloudinary và lưu metadata
+        mediaList = await this.mediaService.uploadMultipleFiles(
+          files,
+          savedRecord.historicalRecordId, 
+          'FamilyHistory'
+        );
+        
+        logger.info(`✅ Uploaded ${files.length} files for historical record ${savedRecord.historicalRecordId}`);
+      } catch (error) {
+        logger.error(`❌ Error uploading files for record ID ${savedRecord.historicalRecordId}: ${error.message}`);
         await this.recordRepository.delete(savedRecord.historicalRecordId);
         throw new BadRequestException(`Failed to create historical record: ${error.message}`);
+      }
+    } else {
+      logger.info(`No files provided for historical record ${savedRecord.historicalRecordId}`);
     }
 
     logger.info(`✅ Family History Record created successfully with ID: ${savedRecord.historicalRecordId}`);
-    return FamilyHistoryRecordMapper.toResponseDto(savedRecord);
-}
+    return FamilyHistoryRecordMapper.toResponseDto(savedRecord, mediaList);
+  }
 
 
 
@@ -85,13 +75,18 @@ export class FamilyHistoryRecordService implements IFamilyHistoryRecordService {
 
     const record = await this.recordRepository.findById(id);
     if (!record) {
-      logger.warn(`Family History Record with ID: ${id} not found`);
-      throw new NotFoundException(`Family History Record with id ${id} not found`);
+        logger.warn(`Family History Record with ID: ${id} not found`);
+        throw new NotFoundException(`Family History Record with id ${id} not found`);
     }
 
-    logger.info(`Family History Record found with ID: ${id}`);
-    return FamilyHistoryRecordMapper.toResponseDto(record);
-  }
+    // 📌 Truy vấn tất cả media có `ownerId = id`
+    const mediaList = await this.mediaService.getMediaByOwners([id], 'FamilyHistory');
+
+    logger.info(`Family History Record found with ID: ${id} and ${mediaList.length} media files`);
+    
+    return FamilyHistoryRecordMapper.toResponseDto(record, mediaList);
+}
+
 
   async getRecordsByFamilyId(familyId: string): Promise<FamilyHistoryRecordResponseDto[]> {
     logger.http(`Fetching history records for Family ID: ${familyId}, sorted by start date`);
@@ -120,20 +115,64 @@ export class FamilyHistoryRecordService implements IFamilyHistoryRecordService {
 }
 
 
-  async updateRecord(id: string, dto: UpdateFamilyHistoryRecordDto): Promise<FamilyHistoryRecordResponseDto> {
+/**
+   * 📌 Update a family history record and handle file uploads/deletions
+   */
+async updateRecord(id: string, dto: UpdateFamilyHistoryRecordDto, files: MulterFile[]): Promise<FamilyHistoryRecordResponseDto> {
     logger.http(`Received request to update family history record with ID: ${id}`);
 
-    const updateEntity = FamilyHistoryRecordMapper.toUpdateEntity(dto);
-    const updatedRecord = await this.recordRepository.update(id, updateEntity);
-
-    if (!updatedRecord) {
+    // Kiểm tra xem record có tồn tại không
+    const existingRecord = await this.recordRepository.findById(id);
+    if (!existingRecord) {
       logger.warn(`Family History Record with ID: ${id} not found for update`);
       throw new NotFoundException(`Family History Record with id ${id} not found`);
     }
 
-    logger.info(`Family History Record updated successfully with ID: ${id}`);
-    return FamilyHistoryRecordMapper.toResponseDto(updatedRecord);
+    let mediaList: MediaResponseDto[] = [];
+
+    // Xóa ảnh nếu có yêu cầu
+    if (dto.deleteImageIds && dto.deleteImageIds.length > 0) {
+      logger.info(`Deleting ${dto.deleteImageIds.length} images for Family History Record ID: ${id}`);
+      
+      try {
+        // Xóa song song để tăng tốc độ
+        await Promise.all(dto.deleteImageIds.map(imageId => this.mediaService.deleteMedia(imageId)));
+        logger.info(`✅ Successfully deleted ${dto.deleteImageIds.length} images`);
+      } catch (error) {
+        logger.error(`❌ Failed to delete some images: ${error.message}`);
+        throw new BadRequestException(`Failed to delete images: ${error.message}`);
+      }
+    }
+
+    // Upload files mới nếu có
+    if (dto.isChangeImage && files && files.length > 0) {
+      logger.info(`Uploading ${files.length} new files for Family History Record ID: ${id}`);
+      
+      try {
+        mediaList = await this.mediaService.uploadMultipleFiles(files, id, 'FamilyHistory');
+        logger.info(`✅ Uploaded ${files.length} new files`);
+      } catch (error) {
+        logger.error(`❌ Failed to upload new files: ${error.message}`);
+        throw new BadRequestException(`Failed to upload new files: ${error.message}`);
+      }
+    } else {
+      // Nếu không có file mới, lấy danh sách media hiện tại
+      mediaList = await this.mediaService.getMediaByOwners([id], 'FamilyHistory');
+    }
+
+    // Cập nhật thông tin record
+    const updateEntity = FamilyHistoryRecordMapper.toUpdateEntity(dto);
+    const updatedRecord = await this.recordRepository.update(id, updateEntity);
+
+    if (!updatedRecord) {
+      logger.warn(`Family History Record with ID: ${id} not found after update`);
+      throw new NotFoundException(`Family History Record with id ${id} not found`);
+    }
++
+    logger.info(`✅ Family History Record updated successfully with ID: ${id}`);
+    return FamilyHistoryRecordMapper.toResponseDto(updatedRecord, mediaList);
   }
+
 
   async deleteRecord(id: string): Promise<FamilyHistoryRecordResponseDto> {
     logger.http(`Received request to delete family history record with ID: ${id}`);

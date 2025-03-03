@@ -27,7 +27,4 @@ export class CreateFamilyHistoryRecordDto {
   @IsDate()
   endDate?: Date;
 
-  @IsOptional()
-  @IsString({ each: true })
-  base64Images?: string[];
 }
