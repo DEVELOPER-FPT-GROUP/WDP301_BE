@@ -1,12 +1,12 @@
-import { 
-  Controller, Get, Post, Put, Delete, Param, Body, UseInterceptors, 
+import {
+  Controller, Get, Post, Put, Delete, Param, Body, UseInterceptors,
   UploadedFiles,
   ParseFilePipeBuilder,
   HttpStatus
 } from '@nestjs/common';
 import { LoggingInterceptor } from 'src/common/interceptors/logging.interceptor';
 
-import { winstonLogger as logger} from 'src/common/winston-logger';
+import { winstonLogger as logger } from 'src/common/winston-logger';
 import { FamilyHistoryRecordService } from '../service/family-history-records.service';
 import { CreateFamilyHistoryRecordDto } from '../dto/request/create-family-history-record.dto';
 import { FamilyHistoryRecordResponseDto } from '../dto/response/family-history-records.dto';
@@ -18,7 +18,7 @@ import { MulterFile } from 'src/common/types/multer-file.type';
 @UseInterceptors(LoggingInterceptor) // ✅ Apply logging interceptor
 @Controller('family-history')
 export class FamilyHistoryRecordController {
-  constructor(private readonly recordService: FamilyHistoryRecordService) {}
+  constructor(private readonly recordService: FamilyHistoryRecordService) { }
 
   /**
    *  Create a new Family History Record
@@ -47,7 +47,7 @@ export class FamilyHistoryRecordController {
     ) files: { files?: MulterFile[] }
   ): Promise<ResponseDTO<FamilyHistoryRecordResponseDto>> {
     logger.http(`Received POST request to create a family history record for Family ID: ${dto.familyId}`);
-    
+
     const result = await this.recordService.createRecord(dto, files?.files || []);
     return ResponseDTO.success(result, 'Family History Record created successfully');
   }
@@ -81,38 +81,38 @@ export class FamilyHistoryRecordController {
     const result = await this.recordService.getRecordsByFamilyId(familyId);
     return ResponseDTO.success(result, `Family History Records for Family ID ${familyId} fetched successfully`);
 
-}
+  }
 
 
- /**
-   * Update a Family History Record by ID with file uploads
-   */
- @Put(':id')
- @UseInterceptors(FileFieldsInterceptor([
-   { name: 'files', maxCount: 10 } // Cho phép tối đa 10 files
- ]))
- async updateRecord(
-   @Param('id') id: string,
-   @Body() dto: UpdateFamilyHistoryRecordDto,
-   @UploadedFiles(
-     new ParseFilePipeBuilder()
-       .addFileTypeValidator({
-         fileType: /(jpg|jpeg|png)$/,
-       })
-       .addMaxSizeValidator({
-         maxSize: 5 * 1024 * 1024 // 5MB
-       })
-       .build({
-         errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
-         fileIsRequired: false, // Files không bắt buộc
-       })
-   ) files: { files?: MulterFile[] }
- ): Promise<ResponseDTO<FamilyHistoryRecordResponseDto>> {
-   logger.http(`Received PUT request to update family history record with ID: ${id}`);
-   
-   const result = await this.recordService.updateRecord(id, dto, files?.files || []);
-   return ResponseDTO.success(result, `Family History Record with ID ${id} updated successfully`);
- }
+  /**
+    * Update a Family History Record by ID with file uploads
+    */
+  @Put(':id')
+  @UseInterceptors(FileFieldsInterceptor([
+    { name: 'files', maxCount: 10 } // Cho phép tối đa 10 files
+  ]))
+  async updateRecord(
+    @Param('id') id: string,
+    @Body() dto: UpdateFamilyHistoryRecordDto,
+    @UploadedFiles(
+      new ParseFilePipeBuilder()
+        //  .addFileTypeValidator({
+        //    fileType: /(jpg|jpeg|png)$/,
+        //  })
+        //  .addMaxSizeValidator({
+        //    maxSize: 5 * 1024 * 1024 // 5MB
+        //  })
+        .build({
+          errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+          fileIsRequired: false, // Files không bắt buộc
+        })
+    ) files: { files?: MulterFile[] }
+  ): Promise<ResponseDTO<FamilyHistoryRecordResponseDto>> {
+    logger.http(`Received PUT request to update family history record with ID: ${id}`);
+
+    const result = await this.recordService.updateRecord(id, dto, files?.files || []);
+    return ResponseDTO.success(result, `Family History Record with ID ${id} updated successfully`);
+  }
 
   /**
    *  Delete a Family History Record by ID

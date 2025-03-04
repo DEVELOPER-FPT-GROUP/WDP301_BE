@@ -13,77 +13,77 @@ export class MediaService {
   constructor(
     private readonly mediaRepository: MediaRepository,
     private readonly cloudinaryService: CloudinaryService,
-  ) {}
+  ) { }
 
- /**
-   * Upload file to Cloudinary and save record in MongoDB
-   */
- async uploadFile(file: MulterFile, ownerId: string, ownerType: 'Event' | 'Member' | 'FamilyHistory'): Promise<MediaResponseDto> {
-  if (!file) {
-    throw new BadRequestException('File is required');
-  }
+  /**
+    * Upload file to Cloudinary and save record in MongoDB
+    */
+  async uploadFile(file: MulterFile, ownerId: string, ownerType: 'Event' | 'Member' | 'FamilyHistory'): Promise<MediaResponseDto> {
+    if (!file) {
+      throw new BadRequestException('File is required');
+    }
 
-  try {
-    // Upload file to Cloudinary
-    const uploadResult = await this.cloudinaryService.uploadFile(file);
+    try {
+      // Upload file to Cloudinary
+      const uploadResult = await this.cloudinaryService.uploadFile(file);
 
-    // Lưu metadata vào MongoDB
-    const mediaEntity = MediaMapper.toEntityFromFile({
-      ownerId,
-      ownerType,
-      fileName: file.originalname,
-      mimeType: file.mimetype,
-      size: file.size,
-      url: uploadResult.secure_url
-    });
-
-    const media = await this.mediaRepository.create(mediaEntity);
-    return MediaMapper.toResponseDto(media);
-  } catch (error) {
-    throw new BadRequestException(`Failed to upload file: ${error.message}`);
-  }
-}
-
-/**
- * Upload multiple files and store metadata
- */
-async uploadMultipleFiles(
-  files: MulterFile[], 
-  ownerId: string, 
-  ownerType: 'Event' | 'Member' | 'FamilyHistory'
-): Promise<MediaResponseDto[]> {
-  if (!files || !Array.isArray(files) || files.length === 0) {
-    throw new BadRequestException('No files provided');
-  }
-
-  try {
-    // Upload tất cả file lên Cloudinary song song
-    const uploadResults = await Promise.all(
-      files.map(file => this.cloudinaryService.uploadFile(file))
-    );
-
-    // Tạo danh sách media entity từ kết quả upload
-    const mediaEntities = uploadResults.map((result, index) => {
-      const file = files[index];
-      return MediaMapper.toEntityFromFile({
+      // Lưu metadata vào MongoDB
+      const mediaEntity = MediaMapper.toEntityFromFile({
         ownerId,
         ownerType,
         fileName: file.originalname,
         mimeType: file.mimetype,
         size: file.size,
-        url: result.secure_url
+        url: uploadResult.secure_url
       });
-    });
 
-    // Lưu tất cả media entity vào MongoDB bằng một lệnh insertMany
-    const mediaList = await this.mediaRepository.createMany(mediaEntities);
-
-    return mediaList.map(MediaMapper.toResponseDto);
-  } catch (error) {
-    logger.error(`Failed to upload multiple files: ${error.message}`);
-    throw new BadRequestException(`Error uploading files: ${error.message}`);
+      const media = await this.mediaRepository.create(mediaEntity);
+      return MediaMapper.toResponseDto(media);
+    } catch (error) {
+      throw new BadRequestException(`Failed to upload file: ${error.message}`);
+    }
   }
-}
+
+  /**
+   * Upload multiple files and store metadata
+   */
+  async uploadMultipleFiles(
+    files: MulterFile[],
+    ownerId: string,
+    ownerType: 'Event' | 'Member' | 'FamilyHistory'
+  ): Promise<MediaResponseDto[]> {
+    if (!files || !Array.isArray(files) || files.length === 0) {
+      throw new BadRequestException('No files provided');
+    }
+
+    try {
+      // Upload tất cả file lên Cloudinary song song
+      const uploadResults = await Promise.all(
+        files.map(file => this.cloudinaryService.uploadFile(file))
+      );
+
+      // Tạo danh sách media entity từ kết quả upload
+      const mediaEntities = uploadResults.map((result, index) => {
+        const file = files[index];
+        return MediaMapper.toEntityFromFile({
+          ownerId,
+          ownerType,
+          fileName: file.originalname,
+          mimeType: file.mimetype,
+          size: file.size,
+          url: result.secure_url
+        });
+      });
+
+      // Lưu tất cả media entity vào MongoDB bằng một lệnh insertMany
+      const mediaList = await this.mediaRepository.createMany(mediaEntities);
+
+      return mediaList.map(MediaMapper.toResponseDto);
+    } catch (error) {
+      logger.error(`Failed to upload multiple files: ${error.message}`);
+      throw new BadRequestException(`Error uploading files: ${error.message}`);
+    }
+  }
 
   /**
    * 📌 Get all media records
@@ -131,7 +131,7 @@ async uploadMultipleFiles(
    */
   async deleteMedia(id: string): Promise<MediaResponseDto> {
     logger.http(`Received request to delete media with ID: ${id}`);
-    
+
     const media = await this.mediaRepository.findById(id);
     if (!media) {
       logger.error(`Media with ID: ${id} not found for deletion`);
@@ -140,14 +140,14 @@ async uploadMultipleFiles(
 
     try {
       // Extract public_id from Cloudinary URL
-      const publicId = this.cloudinaryService.extractPublicId(media.url);
-      
-      // 🗑 Delete file from Cloudinary
-      await this.cloudinaryService.deleteImage(publicId);
+      // const publicId = this.cloudinaryService.extractPublicId(media.url);
+
+      // // 🗑 Delete file from Cloudinary
+      // await this.cloudinaryService.deleteImage(publicId);
 
       // Delete record from MongoDB
       await this.mediaRepository.delete(id);
-      
+
       logger.info(`Media deleted successfully with ID: ${id}`);
       return MediaMapper.toResponseDto(media);
     } catch (error) {
@@ -155,8 +155,8 @@ async uploadMultipleFiles(
       throw new BadRequestException('Failed to delete media');
     }
   }
-  
-  async getMediaByOwners (ownerIds: string[], ownerType: 'Event' | 'Member' | 'FamilyHistory'): Promise<MediaResponseDto[]> {
+
+  async getMediaByOwners(ownerIds: string[], ownerType: 'Event' | 'Member' | 'FamilyHistory'): Promise<MediaResponseDto[]> {
     logger.http(`Fetching media for owners: ${ownerIds.join(', ')}`);
     const mediaList = await this.mediaRepository.findByOwners(ownerIds, ownerType);
     logger.info(`Fetched ${mediaList.length} media for owners: ${ownerIds.join(', ')}`);
