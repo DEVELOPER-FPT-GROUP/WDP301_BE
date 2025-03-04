@@ -28,6 +28,8 @@ import { AccountsService } from '../../accounts/service/accounts.service';
 import { CreateAccountDto } from '../../accounts/dto/request/create-account.dto';
 import { DataUtils } from '../../../utils/data.utils';
 import { RELATIONSHIP_TYPES } from '../../../utils/message.utils';
+import { PaginationDTO } from '../../../utils/pagination.dto';
+import { SearchMemberDto } from '../dto/request/search-member.dto';
 
 @Injectable()
 export class MembersService implements IMembersService {
@@ -53,37 +55,16 @@ export class MembersService implements IMembersService {
   }
 
   /**
-   * Retrieves a member by their unique ID, including spouse and parent details.
+   * Retrieves a member by their unique ID.
    * @param id - The unique identifier of the member.
-   * @returns The member DTO with spouse and parent information.
+   * @returns The member DTO if found, otherwise throws a NotFoundException.
    */
   async getMemberById(id: string): Promise<MemberDTO> {
     const member = await this.membersRepository.findById(id);
     if (!member) {
       throw new NotFoundException('Member not found');
     }
-    // Convert member to DTO
-    const memberDTO = MemberDTO.map(member);
-
-    // Fetch spouse details
-    const spouse = await this.marriagesService.getSpouse(memberDTO.memberId);
-    if (spouse) {
-      memberDTO.spouse =
-        memberDTO.gender === Gender.MALE
-          ? { wifeId: spouse.wifeId }
-          : { husbandId: spouse.husbandId };
-    }
-
-    // Fetch parent-child relationships
-    const childRelations = await this.parentChildRelationshipsService.findByChildIds([memberDTO.memberId]);
-    const parentMap = await this.createParentMap(childRelations);
-
-    // Assign parent details if available
-    if (parentMap.has(memberDTO.memberId)) {
-      memberDTO.parent = parentMap.get(memberDTO.memberId);
-    }
-
-    return memberDTO;
+    return MemberDTO.map(member);
   }
 
   /**
@@ -467,5 +448,69 @@ export class MembersService implements IMembersService {
     });
 
     await this.accountsService.createAccount(createAccountDto);
+  }
+
+  /**
+   * Retrieves a member by their unique ID, including spouse and parent details.
+   * @param id - The unique identifier of the member.
+   * @returns The member DTO with spouse and parent information.
+   */
+  async getMemberDetails(id: string): Promise<MemberDTO> {
+    const member = await this.membersRepository.findById(id);
+    if (!member) {
+      throw new NotFoundException('Member not found');
+    }
+    // Convert member to DTO
+    const memberDTO = MemberDTO.map(member);
+
+    // Fetch spouse details
+    const spouse = await this.marriagesService.getSpouse(memberDTO.memberId);
+    if (spouse) {
+      memberDTO.spouse =
+        memberDTO.gender === Gender.MALE
+          ? { wifeId: spouse.wifeId }
+          : { husbandId: spouse.husbandId };
+    }
+
+    // Fetch parent-child relationships
+    const childRelations = await this.parentChildRelationshipsService.findByChildIds([memberDTO.memberId]);
+    const parentMap = await this.createParentMap(childRelations);
+
+    // Assign parent details if available
+    if (parentMap.has(memberDTO.memberId)) {
+      memberDTO.parent = parentMap.get(memberDTO.memberId);
+    }
+
+    return memberDTO;
+  }
+
+  async searchMembers(searchDto: SearchMemberDto): Promise<PaginationDTO<MemberDTO>> {
+    const { page = 1, limit = 10 } = searchDto;
+    const filters: any = {};
+
+    if (searchDto.name) {
+      filters.$or = [
+        { firstName: new RegExp(searchDto.name, 'i') },
+        { middleName: new RegExp(searchDto.name, 'i') },
+        { lastName: new RegExp(searchDto.name, 'i') }
+      ];
+    }
+
+    if (searchDto.email) {
+      filters.email = new RegExp(searchDto.email, 'i');
+    }
+
+    if (searchDto.isAlive !== undefined) {
+      filters.isAlive = searchDto.isAlive;
+    }
+
+    if (searchDto.gender) {
+      filters.gender = searchDto.gender;
+    }
+
+    const { members, total } = await this.membersRepository.findByFilters(filters, page, limit);
+    const memberDTOs = members.map(member => MemberDTO.map(member));
+
+    return PaginationDTO.create(memberDTOs, total, page, limit);
   }
 }

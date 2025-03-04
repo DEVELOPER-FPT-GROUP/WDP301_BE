@@ -45,4 +45,12 @@ export class CreateChildDto {
 
   @IsEnum(Gender)
   gender: Gender;
+
+  @IsOptional()
+  @IsBoolean()
+  isDeleted?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isSingle?: boolean;
 }

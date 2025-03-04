@@ -17,9 +17,12 @@ export class MemberDTO {
   shortSummary?: string;
   gender: string;
   createdAt: Date;
+  updatedAt: Date;
   parent?: ParentDTO;
   children?: string[];
   spouse?: SpouseDTO;
+  isDeleted: boolean;
+  isSingle: boolean;
 
   static map(member: Member): MemberDTO {
     const dto = new MemberDTO();
@@ -37,6 +40,9 @@ export class MemberDTO {
     dto.shortSummary = member.shortSummary;
     dto.gender = member.gender;
     dto.createdAt = member.createdAt;
+    dto.updatedAt = member.updatedAt;
+    dto.isDeleted = member.isDeleted;
+    dto.isSingle = member.isSingle;
     return dto;
   }
 }
