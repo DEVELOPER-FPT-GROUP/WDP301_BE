@@ -17,6 +17,7 @@ import { MemberDTO } from '../../members/dto/response/member.dto';
 import { CreateFamilyDto } from '../../families/dto/request/create-family.dto';
 import { CreateMemberDto } from '../../members/dto/request/create-member.dto';
 import { FamiliesService } from '../../families/service/families.service';
+import { Gender } from 'src/utils/enum';
 
 @Injectable()
 export class AuthService implements IAuthService {
@@ -24,11 +25,11 @@ export class AuthService implements IAuthService {
     private usedAccessTokens = new Set<string>(); // Track used access tokens (Prevents reuse)
 
     constructor(
-      private jwtService: JwtService,
-      private accountsRepository: AccountsRepository,
-      private memberService: MembersService,
-      private familiesService: FamiliesService
-    ) {}
+        private jwtService: JwtService,
+        private accountsRepository: AccountsRepository,
+        private memberService: MembersService,
+        private familiesService: FamiliesService
+    ) { }
 
     async validateUser(username: string, password: string): Promise<AccountResponseDto | null> {
         const account = await this.accountsRepository.findByUsername(username);
@@ -111,6 +112,9 @@ export class AuthService implements IAuthService {
 
         const createMemberDto: CreateMemberDto = {
             ...registerDto,
+            firstName: 'admin',
+            lastName: 'admin',
+            gender: Gender.MALE,
             familyId: createdFamily.familyId,
         };
 
