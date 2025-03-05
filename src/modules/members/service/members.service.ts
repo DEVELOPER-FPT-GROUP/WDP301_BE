@@ -504,7 +504,7 @@ export class MembersService implements IMembersService {
 
     const account = await this.accountsRepository.existsByUsername(createMemberDto.username);
 
-    if(account) {
+    if (account) {
       throw new ConflictException('Username already exists');
     }
 
@@ -577,6 +577,7 @@ export class MembersService implements IMembersService {
       filters.gender = searchDto.gender;
     }
 
+    filters.familyId = searchDto.familyId;
     const { members, total } = await this.membersRepository.findByFilters(filters, page, limit);
     const memberDTOs = members.map(member => MemberDTO.map(member));
 

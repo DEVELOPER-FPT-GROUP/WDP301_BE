@@ -40,8 +40,6 @@ export class MembersController {
 
   @Get('/search')
   async searchMembers(@Query() searchDto: SearchMemberDto): Promise<ResponseDTO<PaginationDTO<MemberDTO>>> {
-    console.log("searchDto: ", searchDto);
-
     const result = await this.membersService.searchMembers(searchDto);
     return ResponseDTO.success(result, 'Members retrieved successfully');
   }
