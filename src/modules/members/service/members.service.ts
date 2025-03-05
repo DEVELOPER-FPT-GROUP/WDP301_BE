@@ -12,16 +12,16 @@ import { Gender } from '../../../utils/enum';
 import { CreateSpouseDto } from '../dto/request/create-spouse.dto';
 import { CreateChildDto } from '../dto/request/create-child.dto';
 import {
-  ParentChildRelationshipsService
+  ParentChildRelationshipsService,
 } from '../../parent-child-relationships/service/parent-child-relationships.service';
 import { RelationshipTypesService } from '../../relationship-types/service/relationship-types.service';
 import {
-  CreateParentChildRelationshipDto
+  CreateParentChildRelationshipDto,
 } from '../../parent-child-relationships/dto/request/create-parent-child-relationship.dto';
 import { SpouseDTO } from '../dto/response/spouse.dto';
 import { ParentDTO } from '../dto/response/parent.dto';
 import {
-  ParentChildRelationshipDTO
+  ParentChildRelationshipDTO,
 } from '../../parent-child-relationships/dto/response/parent-child-relationship.dto';
 import { MarriageDTO } from '../../marriages/dto/response/marriage.dto';
 import { AccountsService } from '../../accounts/service/accounts.service';
@@ -128,14 +128,15 @@ export class MembersService implements IMembersService {
     const childRelations = await this.parentChildRelationshipsService.findByChildIds(memberIds);
 
     // Create lookup maps
-    const spouseMap = this.createSpouseMap(marriages);
+    const spouseMap = this.createSpouseMap(marriages);  // This will return an array of SpouseDTOs
     const childrenMap = this.createChildrenMap(parentRelations);
     const parentMap = await this.createParentMap(childRelations);
 
     // Assign spouse, children, and parent data
     return memberDTOs.map(memberDTO => {
-      memberDTO.spouse = spouseMap.get(memberDTO.memberId);
-      memberDTO.children = childrenMap.get(memberDTO.memberId);
+      // Assign an array of spouses to the memberDTO
+      memberDTO.spouses = spouseMap.get(memberDTO.memberId);  // Ensure it's always an array
+      memberDTO.children = childrenMap.get(memberDTO.memberId);  // Ensure children is always an array
       memberDTO.parent = parentMap.get(memberDTO.memberId);
       return memberDTO;
     });
@@ -407,14 +408,23 @@ export class MembersService implements IMembersService {
    * @param marriages - An array of marriage relationships.
    * @returns A Map where keys are member IDs and values are SpouseDTO objects.
    */
-  private createSpouseMap(marriages: MarriageDTO[]): Map<string, SpouseDTO> {
-    const spouseMap = new Map<string, SpouseDTO>();
+  private createSpouseMap(marriages: MarriageDTO[]): Map<string, SpouseDTO[]> {
+    const spouseMap = new Map<string, SpouseDTO[]>();
 
     marriages.forEach(marriage => {
-      // Maps husband to wife
-      spouseMap.set(marriage.husbandId, { wifeId: marriage.wifeId });
-      // Maps wife to husband
-      spouseMap.set(marriage.wifeId, { husbandId: marriage.husbandId });
+      // Ensure the map contains an array of spouses for each husband
+      if (!spouseMap.has(marriage.husbandId)) {
+        spouseMap.set(marriage.husbandId, []);
+      }
+      // Add the wife to the husband's list of spouses
+      spouseMap.get(marriage.husbandId)?.push({ wifeId: marriage.wifeId });
+
+      // Ensure the map contains an array of spouses for each wife
+      if (!spouseMap.has(marriage.wifeId)) {
+        spouseMap.set(marriage.wifeId, []);
+      }
+      // Add the husband to the wife's list of spouses
+      spouseMap.get(marriage.wifeId)?.push({ husbandId: marriage.husbandId });
     });
 
     return spouseMap;
@@ -529,25 +539,39 @@ export class MembersService implements IMembersService {
     if (!member) {
       throw new NotFoundException('Member not found');
     }
+
     // Convert member to DTO
     const memberDTO = MemberDTO.map(member);
 
     // Fetch spouse details
-    const spouse = await this.marriagesService.getSpouse(memberDTO.memberId);
-    if (spouse) {
-      memberDTO.spouse =
-        memberDTO.gender === Gender.MALE
-          ? { wifeId: spouse.wifeId }
-          : { husbandId: spouse.husbandId };
-    }
+    const marriages = await this.marriagesService.getAllSpouses([memberDTO.memberId]);
+
+    // Create an array of SpouseDTO from the marriages
+    memberDTO.spouses = marriages
+      .filter(marriage => marriage.husbandId === memberDTO.memberId || marriage.wifeId === memberDTO.memberId)
+      .map(marriage => {
+        // Add the spouse information as an array of SpouseDTO objects
+        return {
+          husbandId: marriage.husbandId,
+          wifeId: marriage.wifeId
+        };
+      });  // Ensure spouse is an array of SpouseDTO
 
     // Fetch parent-child relationships
-    const childRelations = await this.parentChildRelationshipsService.findByChildIds([memberDTO.memberId]);
+    const childRelations = await this.parentChildRelationshipsService.findByParentIds([memberDTO.memberId]);
     const parentMap = await this.createParentMap(childRelations);
 
     // Assign parent details if available
     if (parentMap.has(memberDTO.memberId)) {
       memberDTO.parent = parentMap.get(memberDTO.memberId);
+    }
+
+    // Assign children details
+    const childrenIds = this.createChildrenMap(childRelations).get(memberDTO.memberId);
+    if (childrenIds) {
+      memberDTO.children = childrenIds;
+    } else {
+      memberDTO.children = [];
     }
 
     return memberDTO;
