@@ -128,18 +128,30 @@ export class MembersService implements IMembersService {
     const childRelations = await this.parentChildRelationshipsService.findByChildIds(memberIds);
 
     // Create lookup maps
-    const spouseMap = this.createSpouseMap(marriages);  // This will return an array of SpouseDTOs
+    const spouseMap = this.createSpouseMap(marriages);
     const childrenMap = this.createChildrenMap(parentRelations);
     const parentMap = await this.createParentMap(childRelations);
 
     // Assign spouse, children, and parent data
     return memberDTOs.map(memberDTO => {
-      // Assign an array of spouses to the memberDTO
-      memberDTO.spouses = spouseMap.get(memberDTO.memberId);  // Ensure it's always an array
-      memberDTO.children = childrenMap.get(memberDTO.memberId);  // Ensure children is always an array
+      memberDTO.spouse = spouseMap.get(memberDTO.memberId);
+      memberDTO.children = childrenMap.get(memberDTO.memberId);
       memberDTO.parent = parentMap.get(memberDTO.memberId);
       return memberDTO;
     });
+  }
+
+  private createSpouseMap(marriages: MarriageDTO[]): Map<string, SpouseDTO> {
+    const spouseMap = new Map<string, SpouseDTO>();
+
+    marriages.forEach(marriage => {
+      // Maps husband to wife
+      spouseMap.set(marriage.husbandId, { wifeId: marriage.wifeId });
+      // Maps wife to husband
+      spouseMap.set(marriage.wifeId, { husbandId: marriage.husbandId });
+    });
+
+    return spouseMap;
   }
 
   /**
@@ -408,7 +420,7 @@ export class MembersService implements IMembersService {
    * @param marriages - An array of marriage relationships.
    * @returns A Map where keys are member IDs and values are SpouseDTO objects.
    */
-  private createSpouseMap(marriages: MarriageDTO[]): Map<string, SpouseDTO[]> {
+  private createSpousesMap(marriages: MarriageDTO[]): Map<string, SpouseDTO[]> {
     const spouseMap = new Map<string, SpouseDTO[]>();
 
     marriages.forEach(marriage => {
@@ -546,16 +558,32 @@ export class MembersService implements IMembersService {
     // Fetch spouse details
     const marriages = await this.marriagesService.getAllSpouses([memberDTO.memberId]);
 
-    // Create an array of SpouseDTO from the marriages
-    memberDTO.spouses = marriages
-      .filter(marriage => marriage.husbandId === memberDTO.memberId || marriage.wifeId === memberDTO.memberId)
-      .map(marriage => {
-        // Add the spouse information as an array of SpouseDTO objects
-        return {
-          husbandId: marriage.husbandId,
-          wifeId: marriage.wifeId
-        };
-      });  // Ensure spouse is an array of SpouseDTO
+    // Create spouse map using this.createSpousesMap
+    const spouseMap = this.createSpousesMap(marriages);
+
+    // Assign the array of spouses to the memberDTO
+    memberDTO.spouses = [];
+    for (const spouse of (spouseMap.get(memberDTO.memberId) || [])) {
+      let spouseId = spouse.husbandId || spouse.wifeId;
+
+      // Ensure we only proceed if we have a valid spouse ID
+      if (spouseId) {
+        const fullName = await this.getFullName(spouseId); // Get the full name of the spouse
+
+        // Assign based on gender
+        if (memberDTO.gender === Gender.MALE) {
+          memberDTO.spouses.push({
+            husbandId: spouseId,
+            fullName: fullName
+          });
+        } else {
+          memberDTO.spouses.push({
+            wifeId: spouseId,
+            fullName: fullName
+          });
+        }
+      }
+    }
 
     // Fetch parent-child relationships
     const childRelations = await this.parentChildRelationshipsService.findByParentIds([memberDTO.memberId]);
@@ -566,15 +594,34 @@ export class MembersService implements IMembersService {
       memberDTO.parent = parentMap.get(memberDTO.memberId);
     }
 
-    // Assign children details
+    // Assign children details (id and full name)
     const childrenIds = this.createChildrenMap(childRelations).get(memberDTO.memberId);
+    memberDTO.childDTOS = [];
     if (childrenIds) {
-      memberDTO.children = childrenIds;
-    } else {
-      memberDTO.children = [];
+      for (const childId of childrenIds) {
+        const childMember = await this.getMemberById(childId);
+        if (childMember) {
+          const fullName = await this.getFullName(childMember.memberId); // Get the full name for the child
+          if (memberDTO.childDTOS) {
+            memberDTO.childDTOS.push({
+              childId: childMember.memberId,
+              fullName: fullName,
+            });
+          }
+        }
+      }
     }
 
     return memberDTO;
+  }
+
+// Helper method to get the full name of a member by their memberId
+  private async getFullName(memberId: string): Promise<string> {
+    const member = await this.membersRepository.findById(memberId);
+    if (!member) {
+      throw new NotFoundException('Member not found');
+    }
+    return `${member.firstName} ${member.middleName || ''} ${member.lastName}`;
   }
 
   async searchMembers(
@@ -618,5 +665,21 @@ export class MembersService implements IMembersService {
   
     return PaginationDTO.create(memberDTOs, total, page, limit);
   }
-  
+
+  /**
+   * Soft deletes a member by updating the isDeleted field to true.
+   * @param id - The unique identifier of the member.
+   * @returns True if update was successful, otherwise throws a NotFoundException.
+   */
+  async removeMember(id: string): Promise<MemberDTO> {
+    // Update the isDeleted field to true for the member with the given id
+    const result = await this.membersRepository.update(id, { isDeleted: true });
+
+    if (!result) {
+      throw new NotFoundException('Member not found');
+    }
+
+    return MemberDTO.map(result);
+  }
+
 }

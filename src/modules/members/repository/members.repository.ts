@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { ClientSession, Model } from 'mongoose';
+import mongoose, { ClientSession, Model } from 'mongoose';
 import { Member, MemberDocument } from '../schema/member.schema';
 import { CreateMemberDto } from '../dto/request/create-member.dto';
 import { UpdateMemberDto } from '../dto/request/update-member.dto';
@@ -12,7 +12,7 @@ export class MembersRepository {
   ) {}
 
   async findById(id: string): Promise<Member | null> {
-    return this.memberModel.findOne({ _id: id }).exec();
+    return this.memberModel.findOne({ _id: new mongoose.Types.ObjectId(id) }).exec();
   }
 
   async create(data: CreateMemberDto): Promise<Member> {
