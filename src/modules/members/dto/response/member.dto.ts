@@ -1,6 +1,7 @@
 import { ParentDTO } from './parent.dto';
 import { SpouseDTO } from './spouse.dto';
 import { Member } from '../../schema/member.schema';
+import { ChildDTO } from './child.dto';
 
 export class MemberDTO {
   memberId: string;
@@ -21,7 +22,9 @@ export class MemberDTO {
   updatedAt: Date;
   parent?: ParentDTO;
   children?: string[];
+  spouse?: SpouseDTO;
   spouses?: SpouseDTO[];
+  childDTOS?: ChildDTO[];
   isDeleted: boolean;
 
   static map(member: Member): MemberDTO {
