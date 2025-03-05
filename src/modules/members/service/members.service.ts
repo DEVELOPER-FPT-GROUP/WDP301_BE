@@ -504,7 +504,7 @@ export class MembersService implements IMembersService {
 
     const account = await this.accountsRepository.existsByUsername(createMemberDto.username);
 
-    if(account) {
+    if (account) {
       throw new ConflictException('Username already exists');
     }
 
@@ -557,11 +557,11 @@ export class MembersService implements IMembersService {
     const { page = 1, limit = 10 } = searchDto;
     const filters: any = {};
 
-    if (searchDto.name) {
+    if (searchDto.search) {
       filters.$or = [
-        { firstName: new RegExp(searchDto.name, 'i') },
-        { middleName: new RegExp(searchDto.name, 'i') },
-        { lastName: new RegExp(searchDto.name, 'i') }
+        { firstName: new RegExp(searchDto.search, 'i') },
+        { middleName: new RegExp(searchDto.search, 'i') },
+        { lastName: new RegExp(searchDto.search, 'i') }
       ];
     }
 
@@ -577,6 +577,7 @@ export class MembersService implements IMembersService {
       filters.gender = searchDto.gender;
     }
 
+    filters.familyId = searchDto.familyId;
     const { members, total } = await this.membersRepository.findByFilters(filters, page, limit);
     const memberDTOs = members.map(member => MemberDTO.map(member));
 

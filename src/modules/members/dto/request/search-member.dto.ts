@@ -3,9 +3,12 @@ import { Transform, Type } from 'class-transformer';
 import { Gender } from '../../../../utils/enum';
 
 export class SearchMemberDto {
+  @IsString()
+  familyId: string;
+
   @IsOptional()
   @IsString()
-  name?: string;
+  search?: string;
 
   @IsOptional()
   @IsString()
