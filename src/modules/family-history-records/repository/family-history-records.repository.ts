@@ -6,7 +6,7 @@ import { FamilyHistoryRecord, FamilyHistoryRecordDocument } from '../schema/fami
 
 @Injectable()
 export class FamilyHistoryRecordRepository {
-  constructor(@InjectModel(FamilyHistoryRecord.name) private readonly recordModel: Model<FamilyHistoryRecordDocument>) {}
+  constructor(@InjectModel(FamilyHistoryRecord.name) private readonly recordModel: Model<FamilyHistoryRecordDocument>) { }
 
   /**
    * Creates a new Family History Record
@@ -28,7 +28,7 @@ export class FamilyHistoryRecordRepository {
   async findById(id: string): Promise<FamilyHistoryRecord | null> {
     return this.recordModel.findOne({ historicalRecordId: id }).select('-__v').lean().exec();
   }
-  
+
   async findByFamilyId(familyId: string): Promise<FamilyHistoryRecord[]> {
     return this.recordModel.find({ familyId }).sort({ startDate: 1 }).select('-__v').lean().exec();
   }
@@ -47,16 +47,17 @@ export class FamilyHistoryRecordRepository {
     return this.recordModel.findOneAndDelete({ historicalRecordId: id }).exec();
   }
 
-  async findByFamilyIdWithFilters(filters: any, page: number, limit: number): Promise<{ records: FamilyHistoryRecord[]; total: number }> {
+  async findByFamilyIdWithFilters(filters: any, page: number, limit: number, sortOptions: any = {}): Promise<{ records: FamilyHistoryRecord[]; total: number }> {
     const skip = (page - 1) * limit;
-  
+
     const [records, total] = await Promise.all([
-      this.recordModel.find(filters).skip(skip).limit(limit).select('-__v').lean().exec(),
+      this.recordModel.find(filters).sort(sortOptions)
+        .skip(skip).limit(limit).select('-__v').lean().exec(),
       this.recordModel.countDocuments(filters),
     ]);
-  
+
     return { records, total };
   }
-  
-  
+
+
 }

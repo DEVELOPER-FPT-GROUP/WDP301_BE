@@ -3,30 +3,14 @@ import { Gender } from '../../../../utils/enum';
 
 export class RegisterDto {
     @IsNotEmpty()
+    @IsString()
     familyName: string;
 
-    @IsString()
     @IsNotEmpty()
+    @IsString()
     username: string;
 
-    @IsString()
     @IsNotEmpty()
+    @IsString()
     password: string;
-
-    @IsNotEmpty()
-    firstName: string;
-
-    @IsOptional()
-    @IsString()
-    middleName?: string;
-
-    @IsNotEmpty()
-    lastName: string;
-
-    @IsOptional()
-    @IsString()
-    email?: string;
-
-    @IsEnum(Gender)
-    gender: Gender;
 }

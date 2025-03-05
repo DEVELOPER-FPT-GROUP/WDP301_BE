@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsNumber, Min } from 'class-validator';
+import { IsOptional, IsString, IsNumber, Min, IsBoolean } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 
 export class SearchFamilyHistoryRecordDto {
@@ -17,4 +17,9 @@ export class SearchFamilyHistoryRecordDto {
   @IsNumber()
   @Min(1)
   limit?: number = 10; // Số kết quả trên mỗi trang mặc định
+
+  @IsOptional()
+  @Transform(({ value }) => value === "true" || value === true) // Chuyển đổi chuỗi thành boolean
+  @IsBoolean()
+  sortByStartDate?: boolean = true; // Mặc định là true
 }
