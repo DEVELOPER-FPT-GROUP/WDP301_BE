@@ -32,6 +32,10 @@ export class CreateMemberDto {
   placeOfDeath?: string;
 
   @IsOptional()
+  @IsString()
+  burialPlace?: string;
+
+  @IsOptional()
   @IsBoolean()
   isAlive?: boolean;
 

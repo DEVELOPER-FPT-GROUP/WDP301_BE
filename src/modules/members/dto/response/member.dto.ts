@@ -12,6 +12,7 @@ export class MemberDTO {
   dateOfDeath?: Date;
   placeOfBirth: string;
   placeOfDeath?: string;
+  burialPlace?: string;
   isAlive: boolean;
   generation: number;
   shortSummary?: string;
@@ -34,6 +35,7 @@ export class MemberDTO {
     dto.dateOfDeath = member.dateOfDeath;
     dto.placeOfBirth = member.placeOfBirth;
     dto.placeOfDeath = member.placeOfDeath;
+    dto.burialPlace = member.burialPlace;
     dto.isAlive = member.isAlive;
     dto.generation = member.generation;
     dto.shortSummary = member.shortSummary;

@@ -7,7 +7,7 @@ export type MemberDocument = HydratedDocument<Member>;
 export class Member {
   _id: MongooseSchema.Types.ObjectId;
 
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Family'})
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Family' })
   familyId: MongooseSchema.Types.ObjectId;
 
   @Prop()
@@ -30,6 +30,9 @@ export class Member {
 
   @Prop()
   placeOfDeath: string;
+
+  @Prop()
+  burialPlace: string;
 
   @Prop({ default: true })
   isAlive: boolean;
