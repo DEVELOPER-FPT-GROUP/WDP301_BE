@@ -10,8 +10,6 @@ import { EventsModule } from './modules/events/events.module';
 import { MediaModule } from './modules/media/media.module';
 import { FamilyHistoryRecordModule } from './modules/family-history-records/family-history-records.module';
 import { AccountsModule } from './modules/accounts/accounts.module';
-import { MulterModule } from '@nestjs/platform-express';
-import { memoryStorage } from 'multer';
 import { AuthModule } from './modules/auth/auth.module';
 import { MulterModule } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
