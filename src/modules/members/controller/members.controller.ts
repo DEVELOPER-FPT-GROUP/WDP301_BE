@@ -62,7 +62,7 @@ export class MembersController {
     return ResponseDTO.success(result, 'Member retrieved successfully');
   }
 
-  @Put(':id')
+  @Put('/update/:id')
   async update(
     @Param('id') id: string,
     @Body() updateMemberDto: UpdateMemberDto,
@@ -124,5 +124,11 @@ export class MembersController {
     const result = await this.faceDetectionService.detectAndCropFace(file);
 
     return result;
+  }
+
+  @Put('/delete/:id')
+  async removeMember(@Param('id') id: string): Promise<ResponseDTO<MemberDTO>> {
+    const result = await this.membersService.removeMember(id);
+    return ResponseDTO.success(result, 'Member deleted successfully');
   }
 }

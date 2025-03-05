@@ -546,16 +546,11 @@ export class MembersService implements IMembersService {
     // Fetch spouse details
     const marriages = await this.marriagesService.getAllSpouses([memberDTO.memberId]);
 
-    // Create an array of SpouseDTO from the marriages
-    memberDTO.spouses = marriages
-      .filter(marriage => marriage.husbandId === memberDTO.memberId || marriage.wifeId === memberDTO.memberId)
-      .map(marriage => {
-        // Add the spouse information as an array of SpouseDTO objects
-        return {
-          husbandId: marriage.husbandId,
-          wifeId: marriage.wifeId
-        };
-      });  // Ensure spouse is an array of SpouseDTO
+    // Create spouse map using this.createSpouseMap
+    const spouseMap = this.createSpouseMap(marriages);
+
+    // Assign the array of spouses to the memberDTO
+    memberDTO.spouses = spouseMap.get(memberDTO.memberId) || [];  // Ensure it's always an array
 
     // Fetch parent-child relationships
     const childRelations = await this.parentChildRelationshipsService.findByParentIds([memberDTO.memberId]);
@@ -607,4 +602,21 @@ export class MembersService implements IMembersService {
 
     return PaginationDTO.create(memberDTOs, total, page, limit);
   }
+
+  /**
+   * Soft deletes a member by updating the isDeleted field to true.
+   * @param id - The unique identifier of the member.
+   * @returns True if update was successful, otherwise throws a NotFoundException.
+   */
+  async removeMember(id: string): Promise<MemberDTO> {
+    // Update the isDeleted field to true for the member with the given id
+    const result = await this.membersRepository.update(id, { isDeleted: true });
+
+    if (!result) {
+      throw new NotFoundException('Member not found');
+    }
+
+    return MemberDTO.map(result);
+  }
+
 }
