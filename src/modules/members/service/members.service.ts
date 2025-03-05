@@ -557,11 +557,11 @@ export class MembersService implements IMembersService {
     const { page = 1, limit = 10 } = searchDto;
     const filters: any = {};
 
-    if (searchDto.name) {
+    if (searchDto.search) {
       filters.$or = [
-        { firstName: new RegExp(searchDto.name, 'i') },
-        { middleName: new RegExp(searchDto.name, 'i') },
-        { lastName: new RegExp(searchDto.name, 'i') }
+        { firstName: new RegExp(searchDto.search, 'i') },
+        { middleName: new RegExp(searchDto.search, 'i') },
+        { lastName: new RegExp(searchDto.search, 'i') }
       ];
     }
 

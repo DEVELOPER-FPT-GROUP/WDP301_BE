@@ -10,6 +10,7 @@ import {
   ClassSerializerInterceptor, UseGuards,
   Request,
   Query,
+  Put,
 } from '@nestjs/common';
 import { MembersService } from '../service/members.service';
 import { CreateMemberDto } from '../dto/request/create-member.dto';
@@ -56,7 +57,7 @@ export class MembersController {
     return ResponseDTO.success(result, 'Member retrieved successfully');
   }
 
-  @Patch(':id')
+  @Put(':id')
   async update(
     @Param('id') id: string,
     @Body() updateMemberDto: UpdateMemberDto,

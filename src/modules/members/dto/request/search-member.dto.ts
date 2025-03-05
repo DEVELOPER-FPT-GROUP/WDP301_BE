@@ -8,7 +8,7 @@ export class SearchMemberDto {
 
   @IsOptional()
   @IsString()
-  name?: string;
+  search?: string;
 
   @IsOptional()
   @IsString()
