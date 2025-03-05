@@ -11,6 +11,8 @@ import {
   Request,
   Query,
   Put,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
 import { MembersService } from '../service/members.service';
 import { CreateMemberDto } from '../dto/request/create-member.dto';
@@ -23,13 +25,16 @@ import { LoggingInterceptor } from 'src/common/interceptors/logging.interceptor'
 import { JwtAuthGuard } from '../../auth/guard/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guard/roles.guard';
 import { Roles } from '../../auth/decorator/roles.decorator';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { MulterFile } from 'src/common/types/multer-file.type';
+import { FaceDetectionService } from 'src/modules/ai-face-detection/service/face-detection.service';
 import { PaginationDTO } from '../../../utils/pagination.dto';
 import { SearchMemberDto } from '../dto/request/search-member.dto';
 
 @Controller('members')
 @UseInterceptors(ClassSerializerInterceptor, LoggingInterceptor) // Enable auto-serialization
 export class MembersController {
-  constructor(private readonly membersService: MembersService) { }
+  constructor(private readonly membersService: MembersService,private readonly faceDetectionService: FaceDetectionService) {}
 
   @Post()
   async create(
@@ -107,4 +112,17 @@ export class MembersController {
   }
 
 
+
+  @Post('avatar')
+  @UseInterceptors(FileInterceptor('file'))
+  async testFaceDetection(@UploadedFile() file: MulterFile) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+
+    // Perform face detection
+    const result = await this.faceDetectionService.detectAndCropFace(file);
+
+    return result;
+  }
 }

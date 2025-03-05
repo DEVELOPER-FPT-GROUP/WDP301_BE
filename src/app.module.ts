@@ -13,6 +13,9 @@ import { AccountsModule } from './modules/accounts/accounts.module';
 import { MulterModule } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { AuthModule } from './modules/auth/auth.module';
+import { MulterModule } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+import { AiFaceDetectionModule } from './modules/ai-face-detection/ai-face-detection.module';
 
 @Module({
   imports: [
@@ -38,7 +41,8 @@ import { AuthModule } from './modules/auth/auth.module';
     MediaModule,
     FamilyHistoryRecordModule,
     AccountsModule,
-    AuthModule
+    AuthModule,
+    AiFaceDetectionModule
   ],
 })
 export class AppModule {}
