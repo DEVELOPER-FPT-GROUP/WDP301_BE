@@ -1,5 +1,5 @@
 import { IsOptional, IsString, IsBoolean, IsEnum, IsNumber, Min } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { Gender } from '../../../../utils/enum';
 
 export class SearchMemberDto {
@@ -12,6 +12,7 @@ export class SearchMemberDto {
   email?: string;
 
   @IsOptional()
+  @Transform(({ value }) => value === 'true') // Chuyển đổi string 'true' thành boolean true
   @IsBoolean()
   isAlive?: boolean;
 
