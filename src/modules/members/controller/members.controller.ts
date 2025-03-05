@@ -8,6 +8,8 @@ import {
   Delete,
   UseInterceptors,
   ClassSerializerInterceptor, UseGuards,
+  Request,
+  Query,
 } from '@nestjs/common';
 import { MembersService } from '../service/members.service';
 import { CreateMemberDto } from '../dto/request/create-member.dto';
@@ -24,9 +26,9 @@ import { PaginationDTO } from '../../../utils/pagination.dto';
 import { SearchMemberDto } from '../dto/request/search-member.dto';
 
 @Controller('members')
-@UseInterceptors(ClassSerializerInterceptor,LoggingInterceptor) // Enable auto-serialization
+@UseInterceptors(ClassSerializerInterceptor, LoggingInterceptor) // Enable auto-serialization
 export class MembersController {
-  constructor(private readonly membersService: MembersService) {}
+  constructor(private readonly membersService: MembersService) { }
 
   @Post()
   async create(
@@ -34,6 +36,14 @@ export class MembersController {
   ): Promise<ResponseDTO<MemberDTO>> {
     const result = await this.membersService.createMember(createMemberDto);
     return ResponseDTO.success(result, 'Member created successfully');
+  }
+
+  @Get('/search')
+  async searchMembers(@Query() searchDto: SearchMemberDto): Promise<ResponseDTO<PaginationDTO<MemberDTO>>> {
+    console.log("searchDto: ", searchDto);
+
+    const result = await this.membersService.searchMembers(searchDto);
+    return ResponseDTO.success(result, 'Members retrieved successfully');
   }
 
   @Get()
@@ -97,9 +107,5 @@ export class MembersController {
     return ResponseDTO.success(result, 'Member retrieved successfully');
   }
 
-  @Post('/search')
-  async searchMembers(@Body() searchDto: SearchMemberDto): Promise<ResponseDTO<PaginationDTO<MemberDTO>>> {
-    const result = await this.membersService.searchMembers(searchDto);
-    return ResponseDTO.success(result, 'Members retrieved successfully');
-  }
+
 }
