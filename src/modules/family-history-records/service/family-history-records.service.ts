@@ -165,13 +165,24 @@ async updateRecord(id: string, dto: UpdateFamilyHistoryRecordDto, files: MulterF
 
   async deleteRecord(id: string): Promise<FamilyHistoryRecordResponseDto> {
     logger.http(`Received request to delete family history record with ID: ${id}`);
-
+  
+    // Fetch associated media
+    const mediaList = await this.mediaService.getMediaByOwners([id], 'FamilyHistory');
+    const mediaIds = mediaList.map(media => media.mediaId);
+  
+    // Delete all associated media
+    if (mediaIds.length > 0) {
+      await this.mediaService.deleteMultipleMedia(mediaIds);
+      logger.info(`Deleted ${mediaIds.length} media files associated with Family History Record ID: ${id}`);
+    }
+  
+    // Delete the record
     const deletedRecord = await this.recordRepository.delete(id);
     if (!deletedRecord) {
       logger.error(`Family History Record with ID: ${id} not found for deletion`);
       throw new NotFoundException(`Family History Record with id ${id} not found`);
     }
-
+  
     logger.info(`Family History Record deleted successfully with ID: ${id}`);
     return FamilyHistoryRecordMapper.toResponseDto(deletedRecord);
   }
