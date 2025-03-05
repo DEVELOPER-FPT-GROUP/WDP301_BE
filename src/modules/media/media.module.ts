@@ -8,6 +8,8 @@ import { FirebaseModule } from '../firebase/firebase.module'; // ✅ Import Fire
 import { CloudinaryProvider } from '../cloudinary/cloudinary.provider';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { MulterModule } from '@nestjs/platform-express';
+import { FaceDetectionProvider } from '../ai-face-detection/providers/face-detection.provider';
+import { FaceDetectionService } from '../ai-face-detection/service/face-detection.service';
 
 @Module({
   imports: [
@@ -21,7 +23,7 @@ import { MulterModule } from '@nestjs/platform-express';
     }),
   ],
   controllers: [MediaController], // ✅ Connect Controller
-  providers: [MediaService, MediaRepository, CloudinaryProvider, CloudinaryService], // ✅ Register Service & Repository
+  providers: [MediaService, MediaRepository, CloudinaryProvider, CloudinaryService,FaceDetectionProvider, FaceDetectionService], // ✅ Register Service & Repository
   exports: [MediaService, MediaRepository], // ✅ Allow reusability in other modules
 })
 export class MediaModule {}

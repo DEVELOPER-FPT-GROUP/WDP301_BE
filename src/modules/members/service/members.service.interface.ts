@@ -18,5 +18,5 @@ export interface IMembersService {
   createChild(createChildDto: CreateChildDto): Promise<MemberDTO | null>;
   createFamilyLeader(createMemberDto: CreateMemberDto): Promise<MemberDTO>;
   getMemberDetails(id: string): Promise<MemberDTO>;
-  searchMembers(searchDto: SearchMemberDto): Promise<PaginationDTO<MemberDTO>>
+  searchMembers(familyId: string, searchDto: SearchMemberDto): Promise<PaginationDTO<MemberDTO>>
 }

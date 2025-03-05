@@ -9,6 +9,7 @@ import { MarriagesModule } from '../marriages/marriages.module';
 import { ParentChildRelationshipsModule } from '../parent-child-relationships/parent-child-relationships.module';
 import { RelationshipTypesModule } from '../relationship-types/relationship-types.module';
 import { AccountsModule } from '../accounts/accounts.module';
+import { FaceDetectionService } from '../ai-face-detection/service/face-detection.service';
 
 @Module({
   imports: [
@@ -20,7 +21,7 @@ import { AccountsModule } from '../accounts/accounts.module';
     AccountsModule
   ],
   controllers: [MembersController],
-  providers: [MembersService, MembersRepository],
+  providers: [MembersService, MembersRepository,FaceDetectionService],
   exports: [MembersService, MembersRepository],
 })
 export class MembersModule {}

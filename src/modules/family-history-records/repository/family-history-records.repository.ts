@@ -26,14 +26,11 @@ export class FamilyHistoryRecordRepository {
    * Finds a historical record by ID
    */
   async findById(id: string): Promise<FamilyHistoryRecord | null> {
-    return this.recordModel.findOne({ historicalRecordId: id }).exec();
+    return this.recordModel.findOne({ historicalRecordId: id }).select('-__v').lean().exec();
   }
-
-   /**
-   * Finds historical records by Family ID (sorted by start date)
-   */
-   async findByFamilyId(familyId: string): Promise<FamilyHistoryRecord[]> {
-    return this.recordModel.find({ familyId }).sort({ startDate: 1 }).exec(); // ✅ Sorted by `startDate`
+  
+  async findByFamilyId(familyId: string): Promise<FamilyHistoryRecord[]> {
+    return this.recordModel.find({ familyId }).sort({ startDate: 1 }).select('-__v').lean().exec();
   }
 
   /**
@@ -49,4 +46,17 @@ export class FamilyHistoryRecordRepository {
   async delete(id: string): Promise<FamilyHistoryRecord | null> {
     return this.recordModel.findOneAndDelete({ historicalRecordId: id }).exec();
   }
+
+  async findByFamilyIdWithFilters(filters: any, page: number, limit: number): Promise<{ records: FamilyHistoryRecord[]; total: number }> {
+    const skip = (page - 1) * limit;
+  
+    const [records, total] = await Promise.all([
+      this.recordModel.find(filters).skip(skip).limit(limit).select('-__v').lean().exec(),
+      this.recordModel.countDocuments(filters),
+    ]);
+  
+    return { records, total };
+  }
+  
+  
 }

@@ -7,9 +7,10 @@ import { FamilyHistoryRecordMapper } from '../mapper/family-history-record.mappe
 import { winstonLogger as logger } from 'src/common/winston-logger';
 import { UpdateFamilyHistoryRecordDto } from '../dto/request/update-family-history-record.dto';
 import { MediaService } from 'src/modules/media/serivce/media.service';
-import { CreateMediaDto } from 'src/modules/media/dto/request/create-media.dto';
 import { MediaResponseDto } from 'src/modules/media/dto/response/media-response.dto';
 import { MulterFile } from 'src/common/types/multer-file.type';
+import { SearchFamilyHistoryRecordDto } from '../dto/request/search-family-history-record.dto';
+import { PaginationDTO } from 'src/utils/pagination.dto';
 
 @Injectable()
 export class FamilyHistoryRecordService implements IFamilyHistoryRecordService {
@@ -57,18 +58,6 @@ export class FamilyHistoryRecordService implements IFamilyHistoryRecordService {
     return FamilyHistoryRecordMapper.toResponseDto(savedRecord, mediaList);
   }
 
-
-
-
-
-  // async getAllRecords(): Promise<FamilyHistoryRecordResponseDto[]> {
-  //   logger.http(`Fetching all family history records`);
-    
-  //   const records = await this.recordRepository.findAll();
-  //   logger.info(`Fetched ${records.length} family history records`);
-
-  //   return records.map(FamilyHistoryRecordMapper.toResponseDto);
-  // }
 
   async getRecordById(id: string): Promise<FamilyHistoryRecordResponseDto> {
     logger.http(`Fetching family history record with ID: ${id}`);
@@ -186,4 +175,37 @@ async updateRecord(id: string, dto: UpdateFamilyHistoryRecordDto, files: MulterF
     logger.info(`Family History Record deleted successfully with ID: ${id}`);
     return FamilyHistoryRecordMapper.toResponseDto(deletedRecord);
   }
+
+  async searchRecordsByFamilyId(
+    familyId: string,
+    searchDto: SearchFamilyHistoryRecordDto
+  ): Promise<PaginationDTO<FamilyHistoryRecordResponseDto>> {
+    const { page = 1, limit = 10, search } = searchDto;
+  
+    const filters: any = { familyId };
+    if (search) {
+      const regex = new RegExp(search, 'i');
+      filters.$or = [{ historicalRecordTitle: regex }, { historicalRecordSummary: regex }];
+    }
+  
+    const { records, total } = await this.recordRepository.findByFamilyIdWithFilters(filters, page, limit);
+    
+    if (records.length === 0) return PaginationDTO.create([], 0, page, limit);
+  
+    const recordIds = records.map((record) => record.historicalRecordId);
+    const mediaList = await this.mediaService.getMediaByOwners(recordIds, 'FamilyHistory');
+  
+    const mediaGroupedByRecord = Object.fromEntries(
+      recordIds.map((id) => [id, mediaList.filter((media) => media.ownerId === id)])
+    );
+  
+    return PaginationDTO.create(
+      records.map((record) => FamilyHistoryRecordMapper.toResponseDto(record, mediaGroupedByRecord[record.historicalRecordId] || [])),
+      total,
+      page,
+      limit
+    );
+  }
+  
+  
 }
