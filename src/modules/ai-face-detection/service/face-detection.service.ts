@@ -152,7 +152,7 @@ export class FaceDetectionService implements IFaceDetectionService {
           .png()
           .toBuffer();
 
-      await unlink(processedFilePath);
+      // await unlink(processedFilePath);
       logger.info(`✅ Face detection and cropping completed for: ${file.originalname}`);
 
       return { success: true, faceBuffer: avatarBuffer };

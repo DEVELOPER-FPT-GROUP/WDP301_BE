@@ -172,7 +172,6 @@ async uploadMultipleFiles(
     if (!file) {
       throw new BadRequestException('Avatar file is required');
     }
-
     try {
       logger.http(`Processing avatar for ${ownerType} with ID: ${ownerId}`);
       

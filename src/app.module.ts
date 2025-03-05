@@ -14,7 +14,6 @@ import { AuthModule } from './modules/auth/auth.module';
 import { MulterModule } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { AiFaceDetectionModule } from './modules/ai-face-detection/ai-face-detection.module';
-import { AuthModule } from './modules/auth/auth.module';
 
 @Module({
   imports: [
