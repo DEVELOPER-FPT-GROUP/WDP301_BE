@@ -553,34 +553,46 @@ export class MembersService implements IMembersService {
     return memberDTO;
   }
 
-  async searchMembers(searchDto: SearchMemberDto): Promise<PaginationDTO<MemberDTO>> {
-    const { page = 1, limit = 10 } = searchDto;
-    const filters: any = {};
-
-    if (searchDto.search) {
+  async searchMembers(
+    familyId: string,
+    searchDto: SearchMemberDto
+  ): Promise<PaginationDTO<MemberDTO>> {
+    const { page = 1, limit = 10, search, email, isAlive, gender } = searchDto;
+  
+    const filters: any = { familyId }; // ✅ Ensure familyId is always applied
+  
+    if (search) {
+      const regex = new RegExp(search, 'i');
       filters.$or = [
-        { firstName: new RegExp(searchDto.search, 'i') },
-        { middleName: new RegExp(searchDto.search, 'i') },
-        { lastName: new RegExp(searchDto.search, 'i') }
+        { firstName: regex },
+        { middleName: regex },
+        { lastName: regex }
       ];
     }
-
-    if (searchDto.email) {
-      filters.email = new RegExp(searchDto.email, 'i');
+  
+    if (email) {
+      filters.email = new RegExp(email, 'i');
     }
-
-    if (searchDto.isAlive !== undefined) {
-      filters.isAlive = searchDto.isAlive;
+  
+    if (isAlive !== undefined) {
+      filters.isAlive = isAlive;
     }
-
-    if (searchDto.gender) {
-      filters.gender = searchDto.gender;
+  
+    if (gender) {
+      filters.gender = gender;
     }
-
-    filters.familyId = searchDto.familyId;
+  
     const { members, total } = await this.membersRepository.findByFilters(filters, page, limit);
-    const memberDTOs = members.map(member => MemberDTO.map(member));
-
+  
+    // ✅ Return early if no members are found
+    if (members.length === 0) {
+      return PaginationDTO.create([], 0, page, limit);
+    }
+  
+    // ✅ Map member entities to DTOs
+    const memberDTOs = members.map((member) => MemberDTO.map(member));
+  
     return PaginationDTO.create(memberDTOs, total, page, limit);
   }
+  
 }
