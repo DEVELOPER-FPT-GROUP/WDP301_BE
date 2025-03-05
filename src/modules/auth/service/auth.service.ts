@@ -10,6 +10,13 @@ import { IAuthService } from './auth.service.interface';
 import { RefreshTokenDto } from '../dto/request/refreshToken.dto';
 import { AuthResponseDto } from '../dto/response/auth.dto';
 import { LogoutDto } from '../dto/request/logout.dto';
+import { Account } from '../../accounts/schema/account.schema';
+import { MembersService } from '../../members/service/members.service';
+import { RegisterDto } from '../dto/request/register.dto';
+import { MemberDTO } from '../../members/dto/response/member.dto';
+import { CreateFamilyDto } from '../../families/dto/request/create-family.dto';
+import { CreateMemberDto } from '../../members/dto/request/create-member.dto';
+import { FamiliesService } from '../../families/service/families.service';
 
 @Injectable()
 export class AuthService implements IAuthService {
@@ -19,6 +26,8 @@ export class AuthService implements IAuthService {
     constructor(
       private jwtService: JwtService,
       private accountsRepository: AccountsRepository,
+      private memberService: MembersService,
+      private familiesService: FamiliesService
     ) {}
 
     async validateUser(username: string, password: string): Promise<AccountResponseDto | null> {
@@ -35,21 +44,26 @@ export class AuthService implements IAuthService {
             throw new NotFoundException('Your username or password is incorrect');
         }
 
-        // Generate tokens
         const accessToken = await this.generateToken(account, '15m');
         const refreshToken = await this.generateToken(account, '7d');
 
         // Store refresh token in database
         await this.accountsRepository.updateRefreshToken(String(account.memberId), refreshToken);
 
-        // Return AuthResponseDto with only the access token
         return new AuthResponseDto(accessToken);
     }
 
-
-    private async generateToken(account: any, ttl: string): Promise<string> {
+    private async generateToken(account: Account, ttl: string): Promise<string> {
         const jti = crypto.randomUUID(); // Unique token ID
-        const payload = { username: account.username, sub: account.memberId, jti };
+        const member = await this.memberService.getMemberById(String(account.memberId));
+
+        const payload = {
+            username: account.username,
+            memberId: account.memberId,
+            familyId: member.familyId,
+            jti,
+            role: account.isAdmin ? 'admin' : 'member',
+        };
 
         return this.jwtService.sign(payload, { expiresIn: ttl });
     }
@@ -69,7 +83,7 @@ export class AuthService implements IAuthService {
             throw new UnauthorizedException('Invalid refresh token');
         }
 
-        // Generate new access token (TTL can be customized)
+        // Generate new access token with role and familyId
         const accessToken = await this.generateToken(account, '15m');
 
         return new AuthResponseDto(accessToken);
@@ -84,6 +98,28 @@ export class AuthService implements IAuthService {
 
         // Clear the refresh token
         await this.accountsRepository.updateRefreshToken(logoutDto.memberId, null);
+    }
+
+    async register(registerDto: RegisterDto): Promise<MemberDTO> {
+        console.log('Registering new member as family leader:', registerDto);
+
+        const createFamilyDto: CreateFamilyDto = {
+            familyName: registerDto.familyName
+        };
+
+        const createdFamily = await this.familiesService.createFamily(createFamilyDto);
+
+        const createMemberDto: CreateMemberDto = {
+            ...registerDto,
+            familyId: createdFamily.familyId,
+        };
+
+        const createdMember = await this.memberService.createFamilyLeader(createMemberDto);
+        if (!createdMember) {
+            throw new Error('Failed to register');
+        }
+
+        return createdMember;
     }
 
 }

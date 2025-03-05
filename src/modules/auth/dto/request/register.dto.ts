@@ -1,6 +1,10 @@
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { Gender } from '../../../../utils/enum';
 
 export class RegisterDto {
+    @IsNotEmpty()
+    familyName: string;
+
     @IsString()
     @IsNotEmpty()
     username: string;
@@ -8,4 +12,21 @@ export class RegisterDto {
     @IsString()
     @IsNotEmpty()
     password: string;
+
+    @IsNotEmpty()
+    firstName: string;
+
+    @IsOptional()
+    @IsString()
+    middleName?: string;
+
+    @IsNotEmpty()
+    lastName: string;
+
+    @IsOptional()
+    @IsString()
+    email?: string;
+
+    @IsEnum(Gender)
+    gender: Gender;
 }

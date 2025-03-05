@@ -22,7 +22,6 @@ export class MemberDTO {
   children?: string[];
   spouse?: SpouseDTO;
   isDeleted: boolean;
-  isSingle: boolean;
 
   static map(member: Member): MemberDTO {
     const dto = new MemberDTO();
@@ -42,7 +41,6 @@ export class MemberDTO {
     dto.createdAt = member.createdAt;
     dto.updatedAt = member.updatedAt;
     dto.isDeleted = member.isDeleted;
-    dto.isSingle = member.isSingle;
     return dto;
   }
 }
