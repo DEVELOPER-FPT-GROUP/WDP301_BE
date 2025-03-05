@@ -1,0 +1,27 @@
+import { Module } from '@nestjs/common';
+import { MongooseModule } from '@nestjs/mongoose';
+import { MembersService } from './service/members.service';
+import { MembersController } from './controller/members.controller';
+import { Member, MemberSchema } from './schema/member.schema';
+import { MembersRepository } from './repository/members.repository';
+import { FamiliesModule } from '../families/families.module';
+import { MarriagesModule } from '../marriages/marriages.module';
+import { ParentChildRelationshipsModule } from '../parent-child-relationships/parent-child-relationships.module';
+import { RelationshipTypesModule } from '../relationship-types/relationship-types.module';
+import { AccountsModule } from '../accounts/accounts.module';
+import { FaceDetectionService } from '../ai-face-detection/service/face-detection.service';
+
+@Module({
+  imports: [
+    MongooseModule.forFeature([{ name: Member.name, schema: MemberSchema }]),
+    FamiliesModule,
+    MarriagesModule,
+    ParentChildRelationshipsModule,
+    RelationshipTypesModule,
+    AccountsModule
+  ],
+  controllers: [MembersController],
+  providers: [MembersService, MembersRepository,FaceDetectionService],
+  exports: [MembersService, MembersRepository],
+})
+export class MembersModule {}
