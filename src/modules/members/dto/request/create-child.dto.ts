@@ -1,10 +1,14 @@
-import { IsString, IsNumber, IsNotEmpty, IsOptional, IsDateString, IsBoolean, IsEnum } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsDateString, IsBoolean, IsEnum, IsNumber } from 'class-validator';
 import { Gender } from '../../../../utils/enum';
 
 export class CreateChildDto {
   @IsNotEmpty()
   @IsString()
-  memberId: string;
+  parentId: string;
+
+  @IsOptional()
+    @IsString()
+  parentSpouseId: string;
 
   @IsNumber()
   birthOrder: number;
@@ -45,12 +49,4 @@ export class CreateChildDto {
 
   @IsEnum(Gender)
   gender: Gender;
-
-  @IsOptional()
-  @IsBoolean()
-  isDeleted?: boolean;
-
-  @IsOptional()
-  @IsBoolean()
-  isSingle?: boolean;
 }

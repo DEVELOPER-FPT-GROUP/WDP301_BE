@@ -45,4 +45,16 @@ export class CreateMemberDto {
 
   @IsEnum(Gender)
   gender: Gender;
+
+  @IsOptional()
+  @IsString()
+  username?: string;
+
+  @IsOptional()
+  @IsString()
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  password?: string;
 }

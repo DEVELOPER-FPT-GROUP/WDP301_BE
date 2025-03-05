@@ -6,12 +6,16 @@ import {JwtStrategy} from "./strategy/jwt.strategy";
 import {AuthController} from "./controller/auth.controller";
 import {LocalStrategy} from "./strategy/local.strategy";
 import { AccountsModule } from '../accounts/accounts.module';
+import { MembersModule } from '../members/members.module';
+import { FamiliesModule } from '../families/families.module';
 
 
 @Module({
   imports: [
     PassportModule,
     AccountsModule,
+    MembersModule,
+    FamiliesModule,
     JwtModule.register({
       secret: 'secret',
       signOptions: { expiresIn: '1h' },

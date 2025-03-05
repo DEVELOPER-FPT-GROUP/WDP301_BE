@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { IMembersService } from './members.service.interface';
 import { CreateMemberDto } from '../dto/request/create-member.dto';
 import { MemberDTO } from '../dto/response/member.dto';
@@ -30,6 +30,7 @@ import { DataUtils } from '../../../utils/data.utils';
 import { RELATIONSHIP_TYPES } from '../../../utils/message.utils';
 import { PaginationDTO } from '../../../utils/pagination.dto';
 import { SearchMemberDto } from '../dto/request/search-member.dto';
+import { AccountsRepository } from '../../accounts/repository/accounts.repository';
 
 @Injectable()
 export class MembersService implements IMembersService {
@@ -39,7 +40,8 @@ export class MembersService implements IMembersService {
     private readonly marriagesService: MarriagesService,
     private readonly parentChildRelationshipsService: ParentChildRelationshipsService,
     private readonly relationshipTypeService: RelationshipTypesService,
-    private readonly accountsService: AccountsService
+    private readonly accountsService: AccountsService,
+    private readonly accountsRepository: AccountsRepository
   ) {
   }
 
@@ -225,21 +227,46 @@ export class MembersService implements IMembersService {
    * @returns The newly created child as a MemberDTO, or null if the member or spouse does not exist.
    */
   async createChild(createChildDto: CreateChildDto): Promise<MemberDTO | null> {
-    const member = await this.getMemberById(createChildDto.memberId);
-    if (!member) return null;
+    const { parentId, parentSpouseId } = createChildDto;
 
-    const spouse = await this.marriagesService.getSpouse(member.memberId);
-    if (!spouse) return null;
+    if (parentId === parentSpouseId) {
+      throw new NotFoundException('Parent and spouse cannot be the same person');
+    }
 
-    // Generate MemberDto for child
-    const createMemberDto = this.buildCreateChildMemberDto(member, createChildDto);
+    const parent = await this.getMemberById(parentId);
+    if (!parent) {
+      throw new NotFoundException('Parent not found');
+    }
+
+    let parentSpouse: MemberDTO | null = null;
+
+    if (parentSpouseId) {
+      const parentSpouses = await this.marriagesService.getAllSpouses([parent.memberId]);
+
+      const isValidSpouse = parentSpouses.some(
+        (spouse) => spouse.husbandId === parentSpouseId || spouse.wifeId === parentSpouseId
+      );
+
+      if (!isValidSpouse) {
+        throw new NotFoundException('Spouse is not valid for this parent');
+      }
+
+      parentSpouse = await this.getMemberById(parentSpouseId);
+      if (!parentSpouse) {
+        throw new NotFoundException('Spouse not found');
+      }
+    }
+
+    const createMemberDto = this.buildCreateChildMemberDto(parent, createChildDto);
     const child = await this.createMember(createMemberDto);
     if (!child) return null;
 
-    // Generate parent-child relationship
-    await this.createParentChildRelationships(member, spouse, child, createChildDto.birthOrder);
+    if (parentSpouse) {
+      await this.createParentChildRelationships(parent, parentSpouse, child, createChildDto.birthOrder);
+    } else {
+      await this.createSingleParentChildRelationship(parent, child, createChildDto.birthOrder);
+    }
 
-    // Create account for child
     if (child.isAlive) {
       await this.createChildAccount(child);
     }
@@ -247,9 +274,10 @@ export class MembersService implements IMembersService {
     return child;
   }
 
-  private buildCreateChildMemberDto(member: MemberDTO, createChildDto: CreateChildDto): CreateMemberDto {
+
+  private buildCreateChildMemberDto(parent: MemberDTO, createChildDto: CreateChildDto): CreateMemberDto {
     return Object.assign(new CreateMemberDto(), {
-      familyId: member.familyId,
+      familyId: parent.familyId,
       firstName: createChildDto.firstName,
       middleName: createChildDto.middleName,
       lastName: createChildDto.lastName,
@@ -258,61 +286,63 @@ export class MembersService implements IMembersService {
       placeOfDeath: createChildDto.placeOfDeath,
       dateOfDeath: createChildDto.dateOfDeath,
       isAlive: createChildDto.isAlive,
-      generation: member.generation + 1,
+      generation: parent.generation + 1, // Increase generation level
       shortSummary: createChildDto.shortSummary,
       gender: createChildDto.gender
     });
   }
 
-
   /**
-   * Retrieves the parent-child relationships and creates mapping data for parent lookup.
-   * @param member - The existing parent.
-   * @param spouse - The spouse of the member.
+   * Creates parent-child relationships for a child with both parents.
+   *
+   * @param parent - The primary parent (father or mother).
+   * @param parentSpouse - The spouse of the primary parent.
    * @param child - The newly created child.
    * @param birthOrder - The birth order of the child.
    */
   private async createParentChildRelationships(
-    member: MemberDTO,
-    spouse: MarriageDTO,
+    parent: MemberDTO,
+    parentSpouse: MemberDTO,
     child: MemberDTO,
     birthOrder: number
   ): Promise<void> {
-    // Determine the relationship type for the primary member (father or mother)
     const parentRelationType = await this.relationshipTypeService.getRelationshipTypeByName(
-      member.gender === Gender.MALE ? RELATIONSHIP_TYPES.FATHER : RELATIONSHIP_TYPES.MOTHER
+      parent.gender === Gender.MALE ? RELATIONSHIP_TYPES.FATHER : RELATIONSHIP_TYPES.MOTHER
     );
 
-    // Determine the correct spouse parent ID based on the member's gender
-    const spouseId = member.gender === Gender.MALE ? spouse.wifeId : spouse.husbandId;
-
-    // Determine the relationship type for the spouse (opposite gender)
     const spouseRelationType = await this.relationshipTypeService.getRelationshipTypeByName(
-      member.gender === Gender.MALE ? RELATIONSHIP_TYPES.MOTHER : RELATIONSHIP_TYPES.FATHER
+      parentSpouse.gender === Gender.MALE ? RELATIONSHIP_TYPES.FATHER : RELATIONSHIP_TYPES.MOTHER
     );
 
-    if (!parentRelationType || !spouseRelationType || !spouseId) return; // Exit if any necessary data is missing
+    if (!parentRelationType || !spouseRelationType) return;
 
-    // Generate parent-child relationships
     const parentRelationship = this.buildParentChildRelationship(
-      member.memberId,
+      parent.memberId,
       child.memberId,
       parentRelationType.relaTypeId,
       birthOrder
     );
 
     const spouseRelationship = this.buildParentChildRelationship(
-      spouseId,
+      parentSpouse.memberId,
       child.memberId,
       spouseRelationType.relaTypeId,
       birthOrder
     );
 
-    // Save relationships in the database
     await this.parentChildRelationshipsService.createRelationship(parentRelationship);
     await this.parentChildRelationshipsService.createRelationship(spouseRelationship);
   }
 
+  /**
+   * Constructs a parent-child relationship DTO.
+   *
+   * @param parentId - The unique identifier of the parent.
+   * @param childId - The unique identifier of the child.
+   * @param relaTypeId - The relationship type (father/mother).
+   * @param birthOrder - The birth order of the child.
+   * @returns A new CreateParentChildRelationshipDto object.
+   */
   private buildParentChildRelationship(
     parentId: string,
     childId: string,
@@ -325,6 +355,34 @@ export class MembersService implements IMembersService {
       relaTypeId,
       birthOrder
     });
+  }
+
+  /**
+   * Creates a parent-child relationship for a child with a single parent.
+   *
+   * @param parent - The sole parent (either a father or mother).
+   * @param child - The newly created child.
+   * @param birthOrder - The birth order of the child.
+   */
+  private async createSingleParentChildRelationship(
+    parent: MemberDTO,
+    child: MemberDTO,
+    birthOrder: number
+  ): Promise<void> {
+    const parentRelationType = await this.relationshipTypeService.getRelationshipTypeByName(
+      parent.gender === Gender.MALE ? RELATIONSHIP_TYPES.FATHER : RELATIONSHIP_TYPES.MOTHER
+    );
+
+    if (!parentRelationType) return;
+
+    const parentRelationship = this.buildParentChildRelationship(
+      parent.memberId,
+      child.memberId,
+      parentRelationType.relaTypeId,
+      birthOrder
+    );
+
+    await this.parentChildRelationshipsService.createRelationship(parentRelationship);
   }
 
   /**
@@ -433,17 +491,28 @@ export class MembersService implements IMembersService {
     }
 
     if (createdMember.isAlive) {
-      await this.createFamilyLeaderAccount(createdMember);
+      await this.createFamilyLeaderAccount(createdMember, createMemberDto);
     }
 
     return createdMember;
   }
 
-  private async createFamilyLeaderAccount(member: MemberDTO): Promise<void> {
+  private async createFamilyLeaderAccount(member: MemberDTO, createMemberDto: CreateMemberDto): Promise<void> {
+    if (!createMemberDto.username) {
+      throw new NotFoundException('Username is required');
+    }
+
+    const account = await this.accountsRepository.existsByUsername(createMemberDto.username);
+
+    if(account) {
+      throw new ConflictException('Username already exists');
+    }
+
     const createAccountDto = Object.assign(new CreateAccountDto(), {
       memberId: member.memberId,
-      username: DataUtils.generateUniqueUsername(member.firstName, member.middleName || '', member.lastName),
-      passwordHash: '123456',
+      username: createMemberDto.username,
+      passwordHash: createMemberDto.password,
+      email: createMemberDto.email,
       isAdmin: true,
     });
 

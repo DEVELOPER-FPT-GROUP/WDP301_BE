@@ -5,6 +5,8 @@ import { AuthService } from '../service/auth.service';
 import { RefreshTokenDto } from '../dto/request/refreshToken.dto';
 import { ResponseDTO } from '../../../utils/response.dto';
 import { LogoutDto } from '../dto/request/logout.dto';
+import { RegisterDto } from '../dto/request/register.dto';
+import { MemberDTO } from '../../members/dto/response/member.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -22,10 +24,15 @@ export class AuthController {
         return ResponseDTO.success(authResponse, 'Refresh token successful');
     }
 
-
     @Post('logout')
     async logout(@Body() logoutDto: LogoutDto): Promise<ResponseDTO<any>> {
         await this.authService.logout(logoutDto)
         return ResponseDTO.success(null, 'Logout successful');
+    }
+
+    @Post('register')
+    async register(@Body() registerDto: RegisterDto): Promise<ResponseDTO<MemberDTO>> {
+        const result = await this.authService.register(registerDto)
+        return ResponseDTO.success(result, 'Register successful');
     }
 }

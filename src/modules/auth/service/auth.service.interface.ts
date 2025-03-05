@@ -3,6 +3,8 @@ import { AuthResponseDto } from '../dto/response/auth.dto';
 import { LoginDto } from '../dto/request/login.dto';
 import { RefreshTokenDto } from '../dto/request/refreshToken.dto';
 import { LogoutDto } from '../dto/request/logout.dto';
+import { RegisterDto } from '../dto/request/register.dto';
+import { MemberDTO } from '../../members/dto/response/member.dto';
 
 export interface IAuthService {
   /**
@@ -32,4 +34,6 @@ export interface IAuthService {
    * @returns A message confirming successful logout.
    */
   logout(logoutDto: LogoutDto): Promise<void>;
+
+  register(registerDto: RegisterDto): Promise<MemberDTO>
 }
