@@ -139,6 +139,7 @@ export class MediaService {
 
     try {
       await this.mediaRepository.delete(id);
+      await this.cloudinaryService.deleteImage(media.fileName);
       logger.info(`Media deleted successfully with ID: ${id}`);
       return MediaMapper.toResponseDto(media);
     } catch (error) {
@@ -200,4 +201,41 @@ export class MediaService {
       throw new BadRequestException(`Failed to process avatar: ${error.message}`);
     }
   }
+  /**
+ * Delete multiple media records by IDs
+ */
+async deleteMultipleMedia(mediaIds: string[]): Promise<void> {
+  if (!mediaIds || mediaIds.length === 0) {
+    logger.info('No media IDs provided for deletion');
+    return;
+  }
+
+  logger.http(`Received request to delete ${mediaIds.length} media records`);
+
+  try {
+    const mediaList = await this.mediaRepository.findByIds(mediaIds);
+    if (mediaList.length === 0) {
+      logger.warn(`No media found for IDs: ${mediaIds.join(', ')}`);
+      return;
+    }
+
+    // Extract public IDs from URLs
+    const publicIds = mediaList
+      .map(media => this.cloudinaryService.extractPublicId(media.url))
+      .filter(Boolean);
+
+    // Delete from Cloudinary
+    if (publicIds.length > 0) {
+      await this.cloudinaryService.deleteMultipleFiles(publicIds); // Or use deleteMultipleFilesBulk
+      logger.info(`Deleted ${publicIds.length} files from Cloudinary`);
+    }
+
+    // Delete from MongoDB
+    await this.mediaRepository.deleteMany(mediaIds);
+    logger.info(`Successfully deleted ${mediaList.length} media records from MongoDB`);
+  } catch (error) {
+    logger.error(`Error deleting multiple media: ${error.message}`);
+    throw new BadRequestException(`Failed to delete media: ${error.message}`);
+  }
+}
 }
