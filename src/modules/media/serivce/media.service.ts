@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { MediaResponseDto } from '../dto/response/media-response.dto';
 import { MediaMapper } from '../mapper/media.mapper';
 import { MediaRepository } from '../repository/media.repository';
@@ -20,7 +24,11 @@ export class MediaService {
   /**
    * Upload file to Cloudinary and save record in MongoDB
    */
-  async uploadFile(file: MulterFile, ownerId: string, ownerType: 'Event' | 'Member' | 'FamilyHistory'): Promise<MediaResponseDto> {
+  async uploadFile(
+    file: MulterFile,
+    ownerId: string,
+    ownerType: 'Event' | 'Member' | 'FamilyHistory',
+  ): Promise<MediaResponseDto> {
     if (!file) {
       throw new BadRequestException('File is required');
     }
@@ -60,7 +68,9 @@ export class MediaService {
 
     try {
       // Upload tất cả file lên Cloudinary song song
-      const uploadResults = await Promise.all(files.map(file => this.cloudinaryService.uploadFile(file)));
+      const uploadResults = await Promise.all(
+        files.map((file) => this.cloudinaryService.uploadFile(file)),
+      );
 
       // Tạo danh sách media entity từ kết quả upload
       const mediaEntities = uploadResults.map((result, index) => {
@@ -111,7 +121,10 @@ export class MediaService {
   /**
    * Update media by ID
    */
-  async updateMedia(id: string, dto: UpdateMediaDto): Promise<MediaResponseDto> {
+  async updateMedia(
+    id: string,
+    dto: UpdateMediaDto,
+  ): Promise<MediaResponseDto> {
     logger.http(`Received request to update media with ID: ${id}`);
     const updateEntity = MediaMapper.toUpdateEntity(dto);
     const updatedMedia = await this.mediaRepository.update(id, updateEntity);
@@ -139,7 +152,7 @@ export class MediaService {
 
     try {
       await this.mediaRepository.delete(id);
-      await this.cloudinaryService.deleteImage(media.fileName);
+      // await this.cloudinaryService.deleteImage(media.fileName);
       logger.info(`Media deleted successfully with ID: ${id}`);
       return MediaMapper.toResponseDto(media);
     } catch (error) {
@@ -151,28 +164,43 @@ export class MediaService {
   /**
    * Fetch media by multiple owner IDs
    */
-  async getMediaByOwners(ownerIds: string[], ownerType: 'Event' | 'Member' | 'FamilyHistory'): Promise<MediaResponseDto[]> {
+  async getMediaByOwners(
+    ownerIds: string[],
+    ownerType: 'Event' | 'Member' | 'FamilyHistory',
+  ): Promise<MediaResponseDto[]> {
     logger.http(`Fetching media for owners: ${ownerIds.join(', ')}`);
-    const mediaList = await this.mediaRepository.findByOwners(ownerIds, ownerType);
-    logger.info(`Fetched ${mediaList.length} media for owners: ${ownerIds.join(', ')}`);
+    const mediaList = await this.mediaRepository.findByOwners(
+      ownerIds,
+      ownerType,
+    );
+    logger.info(
+      `Fetched ${mediaList.length} media for owners: ${ownerIds.join(', ')}`,
+    );
     return mediaList.map(MediaMapper.toResponseDto);
   }
 
   /**
    * Process avatar image, detect face, crop, and upload to Cloudinary
    */
-  async processAndUploadAvatar(file: MulterFile, ownerId: string, ownerType: 'Member'): Promise<MediaResponseDto> {
+  async processAndUploadAvatar(
+    file: MulterFile,
+    ownerId: string,
+    ownerType: 'Member',
+  ): Promise<MediaResponseDto> {
     if (!file) {
       throw new BadRequestException('Avatar file is required');
     }
 
     try {
       logger.http(`Processing avatar for ${ownerType} with ID: ${ownerId}`);
-      
+
       // Detect and crop face
-      const faceDetectionResult = await this.faceDetectionService.detectAndCropFace(file);
+      const faceDetectionResult =
+        await this.faceDetectionService.detectAndCropFace(file);
       if (!faceDetectionResult.success || !faceDetectionResult.faceBuffer) {
-        throw new BadRequestException(faceDetectionResult.message || 'Face detection failed');
+        throw new BadRequestException(
+          faceDetectionResult.message || 'Face detection failed',
+        );
       }
 
       // Upload processed avatar to Cloudinary
@@ -194,48 +222,54 @@ export class MediaService {
       });
 
       const media = await this.mediaRepository.create(mediaEntity);
-      logger.info(`✅ Avatar processed and uploaded successfully for ${ownerType} ID: ${ownerId}`);
+      logger.info(
+        `✅ Avatar processed and uploaded successfully for ${ownerType} ID: ${ownerId}`,
+      );
       return MediaMapper.toResponseDto(media);
     } catch (error) {
       logger.error(`❌ Avatar processing error: ${error.message}`);
-      throw new BadRequestException(`Failed to process avatar: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to process avatar: ${error.message}`,
+      );
     }
   }
   /**
- * Delete multiple media records by IDs
- */
-async deleteMultipleMedia(mediaIds: string[]): Promise<void> {
-  if (!mediaIds || mediaIds.length === 0) {
-    logger.info('No media IDs provided for deletion');
-    return;
-  }
-
-  logger.http(`Received request to delete ${mediaIds.length} media records`);
-
-  try {
-    const mediaList = await this.mediaRepository.findByIds(mediaIds);
-    if (mediaList.length === 0) {
-      logger.warn(`No media found for IDs: ${mediaIds.join(', ')}`);
+   * Delete multiple media records by IDs
+   */
+  async deleteMultipleMedia(mediaIds: string[]): Promise<void> {
+    if (!mediaIds || mediaIds.length === 0) {
+      logger.info('No media IDs provided for deletion');
       return;
     }
 
-    // Extract public IDs from URLs
-    const publicIds = mediaList
-      .map(media => this.cloudinaryService.extractPublicId(media.url))
-      .filter(Boolean);
+    logger.http(`Received request to delete ${mediaIds.length} media records`);
 
-    // Delete from Cloudinary
-    if (publicIds.length > 0) {
-      await this.cloudinaryService.deleteMultipleFiles(publicIds); // Or use deleteMultipleFilesBulk
-      logger.info(`Deleted ${publicIds.length} files from Cloudinary`);
+    try {
+      const mediaList = await this.mediaRepository.findByIds(mediaIds);
+      if (mediaList.length === 0) {
+        logger.warn(`No media found for IDs: ${mediaIds.join(', ')}`);
+        return;
+      }
+
+      // Extract public IDs from URLs
+      const publicIds = mediaList
+        .map((media) => this.cloudinaryService.extractPublicId(media.url))
+        .filter(Boolean);
+
+      // Delete from Cloudinary
+      if (publicIds.length > 0) {
+        await this.cloudinaryService.deleteMultipleFiles(publicIds); // Or use deleteMultipleFilesBulk
+        logger.info(`Deleted ${publicIds.length} files from Cloudinary`);
+      }
+
+      // Delete from MongoDB
+      await this.mediaRepository.deleteMany(mediaIds);
+      logger.info(
+        `Successfully deleted ${mediaList.length} media records from MongoDB`,
+      );
+    } catch (error) {
+      logger.error(`Error deleting multiple media: ${error.message}`);
+      throw new BadRequestException(`Failed to delete media: ${error.message}`);
     }
-
-    // Delete from MongoDB
-    await this.mediaRepository.deleteMany(mediaIds);
-    logger.info(`Successfully deleted ${mediaList.length} media records from MongoDB`);
-  } catch (error) {
-    logger.error(`Error deleting multiple media: ${error.message}`);
-    throw new BadRequestException(`Failed to delete media: ${error.message}`);
   }
-}
 }
