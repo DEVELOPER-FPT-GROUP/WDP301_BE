@@ -63,6 +63,6 @@ export class CreateMemberDto {
   password?: string;
 
   @IsOptional()
-  @IsString()
+  @IsBoolean()
   isDeleted?: boolean;
 }

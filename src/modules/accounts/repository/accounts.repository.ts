@@ -104,4 +104,17 @@ export class AccountsRepository {
   async findByRefreshToken(refreshToken: string): Promise<Account | null> {
     return this.accountModel.findOne({ refreshToken }).exec();
   }
+
+  async findByFilters(filters: any, page: number, limit: number): Promise<{ accounts: Account[]; total: number }> {
+    const skip = (page - 1) * limit;
+
+    const [accounts, total] = await Promise.all([
+      this.accountModel.find(filters).skip(skip).limit(limit).exec(),
+      this.accountModel.countDocuments(filters).exec()
+    ]);
+
+    console.log("Accounts: ", accounts);
+
+    return { accounts, total };
+  }
 }
