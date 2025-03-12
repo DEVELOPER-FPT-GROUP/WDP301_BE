@@ -32,7 +32,7 @@ export class Member {
   placeOfDeath: string;
 
   @Prop()
-  burialPlace: string;
+  worship: string;
 
   @Prop({ default: true })
   isAlive: boolean;

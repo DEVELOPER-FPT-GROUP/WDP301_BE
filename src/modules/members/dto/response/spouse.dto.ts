@@ -5,4 +5,8 @@ export class SpouseDTO {
   wife?: MemberDTO;
   husband?: MemberDTO;
   children?: ChildDTO[];
+
+  wifeId?: string;
+  husbandId?: string;
+  fullName?: string;
 }

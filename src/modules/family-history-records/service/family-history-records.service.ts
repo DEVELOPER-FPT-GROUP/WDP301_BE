@@ -7,21 +7,22 @@ import { FamilyHistoryRecordMapper } from '../mapper/family-history-record.mappe
 import { winstonLogger as logger } from 'src/common/winston-logger';
 import { UpdateFamilyHistoryRecordDto } from '../dto/request/update-family-history-record.dto';
 import { MediaService } from 'src/modules/media/serivce/media.service';
-import { CreateMediaDto } from 'src/modules/media/dto/request/create-media.dto';
 import { MediaResponseDto } from 'src/modules/media/dto/response/media-response.dto';
 import { MulterFile } from 'src/common/types/multer-file.type';
+import { SearchFamilyHistoryRecordDto } from '../dto/request/search-family-history-record.dto';
+import { PaginationDTO } from 'src/utils/pagination.dto';
 
 @Injectable()
 export class FamilyHistoryRecordService implements IFamilyHistoryRecordService {
   constructor(
     private readonly recordRepository: FamilyHistoryRecordRepository,
     private readonly mediaService: MediaService,
-  ) {}
+  ) { }
 
- /**
-   * 📌 Create a new family history record and upload multiple files
-   */
- async createRecord(dto: CreateFamilyHistoryRecordDto, files: MulterFile[]): Promise<FamilyHistoryRecordResponseDto> {
+  /**
+    * 📌 Create a new family history record and upload multiple files
+    */
+  async createRecord(dto: CreateFamilyHistoryRecordDto, files: MulterFile[]): Promise<FamilyHistoryRecordResponseDto> {
     if (!dto) {
       throw new BadRequestException('Request body is missing or invalid');
     }
@@ -39,10 +40,10 @@ export class FamilyHistoryRecordService implements IFamilyHistoryRecordService {
         // Upload files to Cloudinary và lưu metadata
         mediaList = await this.mediaService.uploadMultipleFiles(
           files,
-          savedRecord.historicalRecordId, 
+          savedRecord.historicalRecordId,
           'FamilyHistory'
         );
-        
+
         logger.info(`✅ Uploaded ${files.length} files for historical record ${savedRecord.historicalRecordId}`);
       } catch (error) {
         logger.error(`❌ Error uploading files for record ID ${savedRecord.historicalRecordId}: ${error.message}`);
@@ -58,34 +59,22 @@ export class FamilyHistoryRecordService implements IFamilyHistoryRecordService {
   }
 
 
-
-
-
-  // async getAllRecords(): Promise<FamilyHistoryRecordResponseDto[]> {
-  //   logger.http(`Fetching all family history records`);
-    
-  //   const records = await this.recordRepository.findAll();
-  //   logger.info(`Fetched ${records.length} family history records`);
-
-  //   return records.map(FamilyHistoryRecordMapper.toResponseDto);
-  // }
-
   async getRecordById(id: string): Promise<FamilyHistoryRecordResponseDto> {
     logger.http(`Fetching family history record with ID: ${id}`);
 
     const record = await this.recordRepository.findById(id);
     if (!record) {
-        logger.warn(`Family History Record with ID: ${id} not found`);
-        throw new NotFoundException(`Family History Record with id ${id} not found`);
+      logger.warn(`Family History Record with ID: ${id} not found`);
+      throw new NotFoundException(`Family History Record with id ${id} not found`);
     }
 
     // 📌 Truy vấn tất cả media có `ownerId = id`
     const mediaList = await this.mediaService.getMediaByOwners([id], 'FamilyHistory');
 
     logger.info(`Family History Record found with ID: ${id} and ${mediaList.length} media files`);
-    
+
     return FamilyHistoryRecordMapper.toResponseDto(record, mediaList);
-}
+  }
 
 
   async getRecordsByFamilyId(familyId: string): Promise<FamilyHistoryRecordResponseDto[]> {
@@ -104,21 +93,21 @@ export class FamilyHistoryRecordService implements IFamilyHistoryRecordService {
 
     // 📌 Gom nhóm media theo `ownerId`
     const mediaGroupedByRecord = recordIds.reduce((acc, recordId) => {
-        acc[recordId] = mediaList.filter(media => media.ownerId === recordId);
-        return acc;
+      acc[recordId] = mediaList.filter(media => media.ownerId === recordId);
+      return acc;
     }, {} as Record<string, MediaResponseDto[]>);
 
     // 📌 Map từng record với danh sách media tương ứng
-    return records.map(record => 
-        FamilyHistoryRecordMapper.toResponseDto(record, mediaGroupedByRecord[record.historicalRecordId] || [])
+    return records.map(record =>
+      FamilyHistoryRecordMapper.toResponseDto(record, mediaGroupedByRecord[record.historicalRecordId] || [])
     );
-}
+  }
 
 
-/**
-   * 📌 Update a family history record and handle file uploads/deletions
-   */
-async updateRecord(id: string, dto: UpdateFamilyHistoryRecordDto, files: MulterFile[]): Promise<FamilyHistoryRecordResponseDto> {
+  /**
+     * 📌 Update a family history record and handle file uploads/deletions
+     */
+  async updateRecord(id: string, dto: UpdateFamilyHistoryRecordDto, files: MulterFile[]): Promise<FamilyHistoryRecordResponseDto> {
     logger.http(`Received request to update family history record with ID: ${id}`);
 
     // Kiểm tra xem record có tồn tại không
@@ -133,7 +122,7 @@ async updateRecord(id: string, dto: UpdateFamilyHistoryRecordDto, files: MulterF
     // Xóa ảnh nếu có yêu cầu
     if (dto.deleteImageIds && dto.deleteImageIds.length > 0) {
       logger.info(`Deleting ${dto.deleteImageIds.length} images for Family History Record ID: ${id}`);
-      
+
       try {
         // Xóa song song để tăng tốc độ
         await Promise.all(dto.deleteImageIds.map(imageId => this.mediaService.deleteMedia(imageId)));
@@ -147,7 +136,7 @@ async updateRecord(id: string, dto: UpdateFamilyHistoryRecordDto, files: MulterF
     // Upload files mới nếu có
     if (dto.isChangeImage && files && files.length > 0) {
       logger.info(`Uploading ${files.length} new files for Family History Record ID: ${id}`);
-      
+
       try {
         mediaList = await this.mediaService.uploadMultipleFiles(files, id, 'FamilyHistory');
         logger.info(`✅ Uploaded ${files.length} new files`);
@@ -168,22 +157,67 @@ async updateRecord(id: string, dto: UpdateFamilyHistoryRecordDto, files: MulterF
       logger.warn(`Family History Record with ID: ${id} not found after update`);
       throw new NotFoundException(`Family History Record with id ${id} not found`);
     }
-+
-    logger.info(`✅ Family History Record updated successfully with ID: ${id}`);
+    +
+      logger.info(`✅ Family History Record updated successfully with ID: ${id}`);
     return FamilyHistoryRecordMapper.toResponseDto(updatedRecord, mediaList);
   }
 
 
   async deleteRecord(id: string): Promise<FamilyHistoryRecordResponseDto> {
     logger.http(`Received request to delete family history record with ID: ${id}`);
-
+  
+    // Fetch associated media
+    const mediaList = await this.mediaService.getMediaByOwners([id], 'FamilyHistory');
+    const mediaIds = mediaList.map(media => media.mediaId);
+  
+    // Delete all associated media
+    if (mediaIds.length > 0) {
+      await this.mediaService.deleteMultipleMedia(mediaIds);
+      logger.info(`Deleted ${mediaIds.length} media files associated with Family History Record ID: ${id}`);
+    }
+  
+    // Delete the record
     const deletedRecord = await this.recordRepository.delete(id);
     if (!deletedRecord) {
       logger.error(`Family History Record with ID: ${id} not found for deletion`);
       throw new NotFoundException(`Family History Record with id ${id} not found`);
     }
-
+  
     logger.info(`Family History Record deleted successfully with ID: ${id}`);
     return FamilyHistoryRecordMapper.toResponseDto(deletedRecord);
   }
+
+  async searchRecordsByFamilyId(
+    familyId: string,
+    searchDto: SearchFamilyHistoryRecordDto
+  ): Promise<PaginationDTO<FamilyHistoryRecordResponseDto>> {
+    const { page = 1, limit = 10, search, sortByStartDate } = searchDto;
+    const filters: any = { familyId };
+    if (search) {
+      const regex = new RegExp(search, 'i');
+      filters.$or = [{ historicalRecordTitle: regex }, { historicalRecordSummary: regex }];
+    }
+    const sortOptions = sortByStartDate ? { startDate: 1 } : { createdAt: -1 };
+
+    const { records, total } = await this.recordRepository.findByFamilyIdWithFilters(filters, page, limit, sortOptions);
+    console.log(records);
+
+    if (records.length === 0) return PaginationDTO.create([], 0, page, limit);
+
+    const recordIds = records.map((record) => record.historicalRecordId);
+    const mediaList = await this.mediaService.getMediaByOwners(recordIds, 'FamilyHistory');
+
+    const mediaGroupedByRecord = Object.fromEntries(
+      recordIds.map((id) => [id, mediaList.filter((media) => media.ownerId === id)])
+    );
+
+    return PaginationDTO.create(
+      records.map((record) => FamilyHistoryRecordMapper.toResponseDto(record, mediaGroupedByRecord[record.historicalRecordId] || [])),
+      total,
+      page,
+      limit
+    );
+  }
+
+
 }

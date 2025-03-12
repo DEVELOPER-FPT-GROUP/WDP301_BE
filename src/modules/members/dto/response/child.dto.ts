@@ -9,4 +9,9 @@ export class ChildDTO {
     this.birthOrder = childInfo.birthOrder;
 
   }
+
+export class ChildDTO {
+  childId?: string;
+  fullName?: string;
+
 }

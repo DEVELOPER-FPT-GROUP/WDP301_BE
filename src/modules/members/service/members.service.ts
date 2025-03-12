@@ -128,15 +128,32 @@ export class MembersService implements IMembersService {
 
     // Create lookup maps
     const spouseMap = await this.createSpouseMap(marriages);  // This will return an array of SpouseDTOs
+    const spouseMap = this.createSpouseMap(marriages);
+    const childrenMap = this.createChildrenMap(parentRelations);
     const parentMap = await this.createParentMap(childRelations);
 
     // Assign spouse, children, and parent data
     return memberDTOs.map(memberDTO => {
       // Assign an array of spouses to the memberDTO
       memberDTO.spouses = spouseMap.get(memberDTO.memberId);
+      memberDTO.spouse = spouseMap.get(memberDTO.memberId);
+      memberDTO.children = childrenMap.get(memberDTO.memberId);
       memberDTO.parent = parentMap.get(memberDTO.memberId);
       return memberDTO;
     });
+  }
+
+  private createSpouseMap(marriages: MarriageDTO[]): Map<string, SpouseDTO> {
+    const spouseMap = new Map<string, SpouseDTO>();
+
+    marriages.forEach(marriage => {
+      // Maps husband to wife
+      spouseMap.set(marriage.husbandId, { wifeId: marriage.wifeId });
+      // Maps wife to husband
+      spouseMap.set(marriage.wifeId, { husbandId: marriage.husbandId });
+    });
+
+    return spouseMap;
   }
 
   /**
@@ -401,6 +418,12 @@ export class MembersService implements IMembersService {
   }
 
   private async createSpouseMap(marriages: MarriageDTO[]): Promise<Map<string, SpouseDTO[]>> {
+  /**
+   * Creates a mapping of spouses, linking each member to their respective spouse.
+   * @param marriages - An array of marriage relationships.
+   * @returns A Map where keys are member IDs and values are SpouseDTO objects.
+   */
+  private createSpousesMap(marriages: MarriageDTO[]): Map<string, SpouseDTO[]> {
     const spouseMap = new Map<string, SpouseDTO[]>();
 
     // Tập hợp tất cả các ID cần lấy thông tin thành viên
@@ -565,6 +588,32 @@ export class MembersService implements IMembersService {
     // Tạo map lookup cho spouse
     const spouseMap = await this.createSpouseMap(marriages);
     memberDTO.spouses = spouseMap.get(memberDTO.memberId) || [];
+    // Create spouse map using this.createSpousesMap
+    const spouseMap = this.createSpousesMap(marriages);
+
+    // Assign the array of spouses to the memberDTO
+    memberDTO.spouses = [];
+    for (const spouse of (spouseMap.get(memberDTO.memberId) || [])) {
+      let spouseId = spouse.husbandId || spouse.wifeId;
+
+      // Ensure we only proceed if we have a valid spouse ID
+      if (spouseId) {
+        const fullName = await this.getFullName(spouseId); // Get the full name of the spouse
+
+        // Assign based on gender
+        if (memberDTO.gender === Gender.MALE) {
+          memberDTO.spouses.push({
+            husbandId: spouseId,
+            fullName: fullName
+          });
+        } else {
+          memberDTO.spouses.push({
+            wifeId: spouseId,
+            fullName: fullName
+          });
+        }
+      }
+    }
 
     // Lấy quan hệ cha mẹ - con cái
     const childRelations = await this.parentChildRelationshipsService.findByChildIds(memberIds);
@@ -572,38 +621,75 @@ export class MembersService implements IMembersService {
     // Tạo map lookup cho parent
     const parentMap = await this.createParentMap(childRelations);
     memberDTO.parent = parentMap.get(memberDTO.memberId);
+    // Assign children details (id and full name)
+    const childrenIds = this.createChildrenMap(childRelations).get(memberDTO.memberId);
+    memberDTO.childDTOS = [];
+    if (childrenIds) {
+      for (const childId of childrenIds) {
+        const childMember = await this.getMemberById(childId);
+        if (childMember) {
+          const fullName = await this.getFullName(childMember.memberId); // Get the full name for the child
+          if (memberDTO.childDTOS) {
+            memberDTO.childDTOS.push({
+              childId: childMember.memberId,
+              fullName: fullName,
+            });
+          }
+        }
+      }
+    }
 
     return memberDTO;
   }
 
-  async searchMembers(searchDto: SearchMemberDto): Promise<PaginationDTO<MemberDTO>> {
-    const { page = 1, limit = 10 } = searchDto;
-    const filters: any = {};
+// Helper method to get the full name of a member by their memberId
+  private async getFullName(memberId: string): Promise<string> {
+    const member = await this.membersRepository.findById(memberId);
+    if (!member) {
+      throw new NotFoundException('Member not found');
+    }
+    return `${member.firstName} ${member.middleName || ''} ${member.lastName}`;
+  }
 
-    if (searchDto.search) {
+  async searchMembers(
+    familyId: string,
+    searchDto: SearchMemberDto
+  ): Promise<PaginationDTO<MemberDTO>> {
+    const { page = 1, limit = 10, search, email, isAlive, gender } = searchDto;
+  
+    const filters: any = { familyId }; // ✅ Ensure familyId is always applied
+  
+    if (search) {
+      const regex = new RegExp(search, 'i');
       filters.$or = [
-        { firstName: new RegExp(searchDto.search, 'i') },
-        { middleName: new RegExp(searchDto.search, 'i') },
-        { lastName: new RegExp(searchDto.search, 'i') }
+        { firstName: regex },
+        { middleName: regex },
+        { lastName: regex }
       ];
     }
-
-    if (searchDto.email) {
-      filters.email = new RegExp(searchDto.email, 'i');
+  
+    if (email) {
+      filters.email = new RegExp(email, 'i');
     }
-
-    if (searchDto.isAlive !== undefined) {
-      filters.isAlive = searchDto.isAlive;
+  
+    if (isAlive !== undefined) {
+      filters.isAlive = isAlive;
     }
-
-    if (searchDto.gender) {
-      filters.gender = searchDto.gender;
+  
+    if (gender) {
+      filters.gender = gender;
     }
-
-    filters.familyId = searchDto.familyId;
+  
     const { members, total } = await this.membersRepository.findByFilters(filters, page, limit);
-    const memberDTOs = members.map(member => MemberDTO.map(member));
-
+  
+    // ✅ Return early if no members are found
+    if (members.length === 0) {
+      return PaginationDTO.create([], 0, page, limit);
+    }
+  
+    // ✅ Map member entities to DTOs
+    const memberDTOs = members.map((member) => MemberDTO.map(member));
+  
     return PaginationDTO.create(memberDTOs, total, page, limit);
   }
 

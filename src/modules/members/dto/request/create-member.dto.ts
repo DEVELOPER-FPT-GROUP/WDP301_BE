@@ -33,7 +33,7 @@ export class CreateMemberDto {
 
   @IsOptional()
   @IsString()
-  burialPlace?: string;
+  worship?: string;
 
   @IsOptional()
   @IsBoolean()

@@ -36,6 +36,7 @@ export class CreateEventDto {
   @IsOptional()
   recurrenceFrequency?: string;
 
+  @Type(() => Number) 
   @IsNumber()
   @IsOptional()
   interval?: number;
@@ -43,7 +44,8 @@ export class CreateEventDto {
   @IsString()
   @IsOptional()
   byDay?: string;
-
+  
+  @Type(() => Number) 
   @IsNumber()
   @IsOptional()
   byMonthDay?: number;

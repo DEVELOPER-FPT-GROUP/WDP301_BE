@@ -3,15 +3,8 @@ import { Gender } from '../../../../utils/enum';
 
 export class RegisterDto {
     @IsNotEmpty()
+    @IsString()
     familyName: string;
-
-    @IsString()
-    @IsNotEmpty()
-    username: string;
-
-    @IsString()
-    @IsNotEmpty()
-    password: string;
 
     @IsOptional()
     @IsString()
@@ -20,4 +13,12 @@ export class RegisterDto {
     @IsOptional()
     @IsString()
     memberId?: string;
+
+    @IsNotEmpty()
+    @IsString()
+    username: string;
+
+    @IsNotEmpty()
+    @IsString()
+    password: string
 }

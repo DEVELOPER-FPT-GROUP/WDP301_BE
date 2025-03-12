@@ -30,7 +30,7 @@ import { MulterFile } from 'src/common/types/multer-file.type';
 import { FaceDetectionService } from 'src/modules/ai-face-detection/service/face-detection.service';
 import { PaginationDTO } from '../../../utils/pagination.dto';
 import { SearchMemberDto } from '../dto/request/search-member.dto';
-
+import { winstonLogger as logger } from 'src/common/winston-logger';
 @Controller('members')
 @UseInterceptors(ClassSerializerInterceptor, LoggingInterceptor) // Enable auto-serialization
 export class MembersController {
@@ -44,9 +44,12 @@ export class MembersController {
     return ResponseDTO.success(result, 'Member created successfully');
   }
 
-  @Get('/search')
-  async searchMembers(@Query() searchDto: SearchMemberDto): Promise<ResponseDTO<PaginationDTO<MemberDTO>>> {
-    const result = await this.membersService.searchMembers(searchDto);
+  @Get('family/:familyId/search')
+  async searchMembers(
+    @Param('familyId') familyId: string,
+    @Query() searchDto: SearchMemberDto): Promise<ResponseDTO<PaginationDTO<MemberDTO>>> {
+    logger.http(`Received GET request to search members for Family ID: ${familyId}`);
+    const result = await this.membersService.searchMembers(familyId,searchDto);
     return ResponseDTO.success(result, 'Members retrieved successfully');
   }
 
