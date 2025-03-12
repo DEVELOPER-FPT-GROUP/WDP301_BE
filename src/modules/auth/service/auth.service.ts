@@ -19,9 +19,10 @@ import { MembersService } from '../../members/service/members.service';
 import { RegisterDto } from '../dto/request/register.dto';
 import { MemberDTO } from '../../members/dto/response/member.dto';
 import { CreateFamilyDto } from '../../families/dto/request/create-family.dto';
-import { CreateMemberDto } from '../../members/dto/request/create-member.dto';
 import { FamiliesService } from '../../families/service/families.service';
-import { Gender } from 'src/utils/enum';
+import { AccountsService } from '../../accounts/service/accounts.service';
+import { CreateAccountDto } from '../../accounts/dto/request/create-account.dto';
+
 
 @Injectable()
 export class AuthService implements IAuthService {
@@ -42,6 +43,7 @@ export class AuthService implements IAuthService {
     const account = await this.accountsRepository.findByUsername(username);
     if (account && (await bcrypt.compare(password, account.passwordHash))) {
       return AccountMapper.toResponseDto(account);
+
     }
     return null;
   }
@@ -103,6 +105,25 @@ export class AuthService implements IAuthService {
     if (!account) {
       throw new UnauthorizedException('Invalid refresh token');
     }
+
+    async register(registerDto: RegisterDto): Promise<void> {
+        console.log('Registering new member as family leader:', registerDto);
+
+        const createAccountDto: CreateAccountDto = {
+            memberId: registerDto.memberId || '',
+            username: registerDto.username,
+            passwordHash: registerDto.password,
+            email: registerDto.email || ''
+        }
+
+        const account = await this.accountsService.createFamilyLeaderAccount(createAccountDto);
+
+        const createFamilyDto: CreateFamilyDto = {
+            familyName: registerDto.familyName,
+            adminAccountId: account.accountId
+        };
+
+        await this.familiesService.createFamily(createFamilyDto);
 
     // Generate new access token with role and familyId
     const accessToken = await this.generateToken(account, '15m');

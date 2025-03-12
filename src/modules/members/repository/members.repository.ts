@@ -58,4 +58,16 @@ export class MembersRepository {
 
     return { members, total };
   }
+
+  /**
+   * Finds multiple members by their IDs.
+   * @param ids - An array of member IDs.
+   * @returns An array of Member objects matching the given IDs.
+   */
+  async findByIds(ids: string[]): Promise<Member[]> {
+    if (!ids.length) return [];
+
+    return this.memberModel.find({ _id: { $in: ids.map(id => new mongoose.Types.ObjectId(id)) } }).exec();
+  }
+
 }
