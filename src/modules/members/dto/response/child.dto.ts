@@ -1,11 +1,11 @@
+import { MemberDTO } from './member.dto';
+
 export class ChildDTO {
-  childId?: string;
-  fullName?: string;
+  child?: MemberDTO;
   birthOrder?: number;
 
-  constructor(childInfo: { childId: string, fullName: string, birthOrder: number }) {
-    this.childId = childInfo.childId;
-    this.fullName = childInfo.fullName;
+  constructor(childInfo: { child: MemberDTO , birthOrder: number }) {
+    this.child = childInfo.child;
     this.birthOrder = childInfo.birthOrder;
 
   }

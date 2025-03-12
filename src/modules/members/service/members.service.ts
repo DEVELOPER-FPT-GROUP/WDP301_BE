@@ -400,40 +400,50 @@ export class MembersService implements IMembersService {
     await this.accountsService.createAccount(createAccountDto);
   }
 
-  private async createSpouseMap(
-    marriages: MarriageDTO[]
-  ): Promise<Map<string, SpouseDTO[]>> {
+  private async createSpouseMap(marriages: MarriageDTO[]): Promise<Map<string, SpouseDTO[]>> {
     const spouseMap = new Map<string, SpouseDTO[]>();
 
-    // Collect all unique parent IDs from marriages
-    const parentIds = new Set<string>();
-    marriages.forEach(marriage => {
-      if (marriage.husbandId) parentIds.add(marriage.husbandId);
-      if (marriage.wifeId) parentIds.add(marriage.wifeId);
+    // Tập hợp tất cả các ID cần lấy thông tin thành viên
+    const memberIds = new Set<string>();
+    marriages.forEach(({ husbandId, wifeId }) => {
+      if (husbandId) memberIds.add(husbandId);
+      if (wifeId) memberIds.add(wifeId);
     });
 
-    // Fetch children for these parents
-    const childrenMap = await this.parentChildRelationshipsService.findChildrenByParentsId(Array.from(parentIds));
+    // Lấy thông tin thành viên từ repository
+    const members = await this.membersRepository.findByIds(Array.from(memberIds));
+    const memberMap = new Map<string, MemberDTO>(members.map(member => [String(member._id), MemberDTO.map(member)]));
 
-    // Process marriages to create spouse relationships
-    marriages.forEach(marriage => {
-      const { husbandId, wifeId } = marriage;
+    // Lấy danh sách con theo parentId
+    const childrenMap = await this.parentChildRelationshipsService.findChildrenByParentsId(Array.from(memberIds));
 
+    // Xây dựng spouse map
+    marriages.forEach(({ husbandId, wifeId }) => {
+      if (!husbandId || !wifeId) return; // Bỏ qua nếu thiếu ID
+
+      const husband = memberMap.get(husbandId);
+      const wife = memberMap.get(wifeId);
+
+      if (!husband || !wife) return; // Bỏ qua nếu không tìm thấy thông tin spouse
+
+      // Thêm wife vào danh sách spouse của husband
       if (!spouseMap.has(husbandId)) spouseMap.set(husbandId, []);
       spouseMap.get(husbandId)!.push({
-        wifeId,
-        children: childrenMap.get(husbandId) || []
+        wife,
+        children: childrenMap.get(husbandId) || []  // Luôn trả về mảng
       });
 
+      // Thêm husband vào danh sách spouse của wife
       if (!spouseMap.has(wifeId)) spouseMap.set(wifeId, []);
       spouseMap.get(wifeId)!.push({
-        husbandId,
-        children: childrenMap.get(wifeId) || []
+        husband,
+        children: childrenMap.get(wifeId) || []  // Luôn trả về mảng
       });
     });
 
     return spouseMap;
   }
+
 
   /**
    * Creates a map linking each parent to their children.

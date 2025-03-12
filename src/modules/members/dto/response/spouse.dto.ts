@@ -1,7 +1,8 @@
 import { ChildDTO } from './child.dto';
+import { MemberDTO } from './member.dto';
 
 export class SpouseDTO {
-  wifeId?: string;
-  husbandId?: string;
+  wife?: MemberDTO;
+  husband?: MemberDTO;
   children?: ChildDTO[];
 }

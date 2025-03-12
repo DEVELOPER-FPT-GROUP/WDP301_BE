@@ -7,6 +7,7 @@ import { IParentChildRelationshipsService } from './parent-child-relationships.s
 import { Promise } from 'mongoose';
 import { MembersRepository } from '../../members/repository/members.repository';
 import { ChildDTO } from '../../members/dto/response/child.dto';
+import { MemberDTO } from '../../members/dto/response/member.dto';
 
 @Injectable()
 export class ParentChildRelationshipsService implements IParentChildRelationshipsService {
@@ -70,26 +71,35 @@ export class ParentChildRelationshipsService implements IParentChildRelationship
   async findChildrenByParentsId(parentsId: string[]): Promise<Map<string, ChildDTO[]>> {
     if (!parentsId.length) return new Map();
 
-    // Fetch parent-child relationships from the repository
+    // Lấy quan hệ cha-con từ repository
     const parentChildRelations = await this.parentChildRelationshipsRepository.findChildrenByParentsId(parentsId);
 
-    // Organize children by parent ID
+    // Tập hợp tất cả ID của con cái để lấy thông tin thành viên trong 1 lần
+    const childIds = parentChildRelations.map(relation => String(relation.childId));
+    const children = await this.membersRepository.findByIds(childIds);
+
+    // Tạo một Map để dễ truy vấn MemberDTO từ childId
+    const memberMap = new Map<string, MemberDTO>(children.map(child => [String(child._id), MemberDTO.map(child)]));
+
+    // Tạo Map kết quả
     const childrenMap = new Map<string, ChildDTO[]>();
 
     for (const relation of parentChildRelations) {
       const { parentId, childId, birthOrder } = relation;
 
+      // Nếu parent chưa có trong map, khởi tạo danh sách trống
       if (!childrenMap.has(String(parentId))) {
         childrenMap.set(String(parentId), []);
       }
 
-      const child = await this.membersRepository.findById(String(childId));
+      // Lấy thông tin child từ map (tránh gọi findById từng cái một)
+      const childMember = memberMap.get(String(childId));
+      if (!childMember) continue; // Nếu không tìm thấy, bỏ qua
 
-      // Use `ChildDTO` structure correctly
+      // Thêm vào danh sách con của parent
       childrenMap.get(String(parentId))!.push(new ChildDTO({
-        childId: String(childId),
-        fullName: child?.firstName + ' ' + child?.middleName + ' ' + child?.lastName,
-        birthOrder: birthOrder
+        child: childMember,
+        birthOrder
       }));
     }
 
