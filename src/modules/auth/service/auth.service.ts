@@ -15,8 +15,9 @@ import { MembersService } from '../../members/service/members.service';
 import { RegisterDto } from '../dto/request/register.dto';
 import { MemberDTO } from '../../members/dto/response/member.dto';
 import { CreateFamilyDto } from '../../families/dto/request/create-family.dto';
-import { CreateMemberDto } from '../../members/dto/request/create-member.dto';
 import { FamiliesService } from '../../families/service/families.service';
+import { AccountsService } from '../../accounts/service/accounts.service';
+import { CreateAccountDto } from '../../accounts/dto/request/create-account.dto';
 
 @Injectable()
 export class AuthService implements IAuthService {
@@ -27,7 +28,8 @@ export class AuthService implements IAuthService {
       private jwtService: JwtService,
       private accountsRepository: AccountsRepository,
       private memberService: MembersService,
-      private familiesService: FamiliesService
+      private familiesService: FamiliesService,
+      private accountsService: AccountsService,
     ) {}
 
     async validateUser(username: string, password: string): Promise<AccountResponseDto | null> {
@@ -100,26 +102,24 @@ export class AuthService implements IAuthService {
         await this.accountsRepository.updateRefreshToken(logoutDto.memberId, null);
     }
 
-    async register(registerDto: RegisterDto): Promise<MemberDTO> {
+    async register(registerDto: RegisterDto): Promise<void> {
         console.log('Registering new member as family leader:', registerDto);
 
-        const createFamilyDto: CreateFamilyDto = {
-            familyName: registerDto.familyName
-        };
-
-        const createdFamily = await this.familiesService.createFamily(createFamilyDto);
-
-        const createMemberDto: CreateMemberDto = {
-            ...registerDto,
-            familyId: createdFamily.familyId,
-        };
-
-        const createdMember = await this.memberService.createFamilyLeader(createMemberDto);
-        if (!createdMember) {
-            throw new Error('Failed to register');
+        const createAccountDto: CreateAccountDto = {
+            memberId: registerDto.memberId || '',
+            username: registerDto.username,
+            passwordHash: registerDto.password,
+            email: registerDto.email || ''
         }
 
-        return createdMember;
+        const account = await this.accountsService.createFamilyLeaderAccount(createAccountDto);
+
+        const createFamilyDto: CreateFamilyDto = {
+            familyName: registerDto.familyName,
+            adminAccountId: account.accountId
+        };
+
+        await this.familiesService.createFamily(createFamilyDto);
     }
 
 }

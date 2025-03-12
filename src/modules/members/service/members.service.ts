@@ -538,33 +538,7 @@ export class MembersService implements IMembersService {
       throw new Error('Failed to create family leader');
     }
 
-    if (createdMember.isAlive) {
-      await this.createFamilyLeaderAccount(createdMember, createMemberDto);
-    }
-
     return createdMember;
-  }
-
-  private async createFamilyLeaderAccount(member: MemberDTO, createMemberDto: CreateMemberDto): Promise<void> {
-    if (!createMemberDto.username) {
-      throw new NotFoundException('Username is required');
-    }
-
-    const account = await this.accountsRepository.existsByUsername(createMemberDto.username);
-
-    if (account) {
-      throw new ConflictException('Username already exists');
-    }
-
-    const createAccountDto = Object.assign(new CreateAccountDto(), {
-      memberId: member.memberId,
-      username: createMemberDto.username,
-      passwordHash: createMemberDto.password,
-      email: createMemberDto.email,
-      isAdmin: true,
-    });
-
-    await this.accountsService.createAccount(createAccountDto);
   }
 
   /**

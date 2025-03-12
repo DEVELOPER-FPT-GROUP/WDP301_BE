@@ -13,20 +13,11 @@ export class RegisterDto {
     @IsNotEmpty()
     password: string;
 
-    @IsNotEmpty()
-    firstName: string;
-
-    @IsOptional()
-    @IsString()
-    middleName?: string;
-
-    @IsNotEmpty()
-    lastName: string;
-
     @IsOptional()
     @IsString()
     email?: string;
 
-    @IsEnum(Gender)
-    gender: Gender;
+    @IsOptional()
+    @IsString()
+    memberId?: string;
 }
