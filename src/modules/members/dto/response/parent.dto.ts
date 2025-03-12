@@ -1,4 +1,6 @@
+import { MemberDTO } from './member.dto';
+
 export class ParentDTO {
-  fatherId?: string;
-  motherId?: string;
+  father?: MemberDTO;
+  mother?: MemberDTO;
 }

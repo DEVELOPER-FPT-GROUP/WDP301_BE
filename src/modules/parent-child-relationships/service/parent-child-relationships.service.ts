@@ -5,10 +5,15 @@ import { UpdateParentChildRelationshipDto } from '../dto/request/update-parent-c
 import { ParentChildRelationshipsRepository } from '../repository/parent-child-relationships.repository';
 import { IParentChildRelationshipsService } from './parent-child-relationships.service.interface';
 import { Promise } from 'mongoose';
+import { MembersRepository } from '../../members/repository/members.repository';
+import { ChildDTO } from '../../members/dto/response/child.dto';
 
 @Injectable()
 export class ParentChildRelationshipsService implements IParentChildRelationshipsService {
-  constructor(private readonly parentChildRelationshipsRepository: ParentChildRelationshipsRepository) {}
+  constructor(
+    private readonly parentChildRelationshipsRepository: ParentChildRelationshipsRepository,
+    private readonly membersRepository: MembersRepository
+  ) {}
 
   async createRelationship(dto: CreateParentChildRelationshipDto): Promise<ParentChildRelationshipDTO> {
     const createdRelationship = await this.parentChildRelationshipsRepository.create(dto);
@@ -44,7 +49,7 @@ export class ParentChildRelationshipsService implements IParentChildRelationship
     return true;
   }
 
-  findByChildIds(childIds: string[]): Promise<ParentChildRelationshipDTO[]> {
+  async findByChildIds(childIds: string[]): Promise<ParentChildRelationshipDTO[]> {
     if (!childIds.length)
       return Promise.resolve([]);
 
@@ -53,13 +58,42 @@ export class ParentChildRelationshipsService implements IParentChildRelationship
       .then(relationships => relationships.map(relationship => ParentChildRelationshipDTO.map(relationship)));
   }
 
-  findByParentIds(parentIds: string[]): Promise<ParentChildRelationshipDTO[]> {
+  async findByParentIds(parentIds: string[]): Promise<ParentChildRelationshipDTO[]> {
     if (!parentIds.length)
       return Promise.resolve([]);
 
     return this.parentChildRelationshipsRepository
       .findByParentIds(parentIds)
       .then(relationships => relationships.map(relationship => ParentChildRelationshipDTO.map(relationship)));
+  }
+
+  async findChildrenByParentsId(parentsId: string[]): Promise<Map<string, ChildDTO[]>> {
+    if (!parentsId.length) return new Map();
+
+    // Fetch parent-child relationships from the repository
+    const parentChildRelations = await this.parentChildRelationshipsRepository.findChildrenByParentsId(parentsId);
+
+    // Organize children by parent ID
+    const childrenMap = new Map<string, ChildDTO[]>();
+
+    for (const relation of parentChildRelations) {
+      const { parentId, childId, birthOrder } = relation;
+
+      if (!childrenMap.has(String(parentId))) {
+        childrenMap.set(String(parentId), []);
+      }
+
+      const child = await this.membersRepository.findById(String(childId));
+
+      // Use `ChildDTO` structure correctly
+      childrenMap.get(String(parentId))!.push(new ChildDTO({
+        childId: String(childId),
+        fullName: child?.firstName + ' ' + child?.middleName + ' ' + child?.lastName,
+        birthOrder: birthOrder
+      }));
+    }
+
+    return childrenMap;
   }
 
 }
