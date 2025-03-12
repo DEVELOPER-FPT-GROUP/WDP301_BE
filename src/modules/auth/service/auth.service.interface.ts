@@ -35,5 +35,5 @@ export interface IAuthService {
    */
   logout(logoutDto: LogoutDto): Promise<void>;
 
-  register(registerDto: RegisterDto): Promise<void>;
+  register(registerDto: RegisterDto): Promise<MemberDTO>
 }

@@ -43,11 +43,4 @@ export class ParentChildRelationshipsRepository {
     if (!parentIds.length) return [];
     return await this.parentChildModel.find({ parentId: { $in: parentIds } }).exec();
   }
-
-  async findChildrenByParentsId(parentsId: string[]): Promise<ParentChildRelationship[]> {
-    if (!parentsId.length) return [];
-
-    // Query to find all child relationships where parentId is in parentsId array
-    return this.parentChildModel.find({ parentId: { $in: parentsId } }).lean().exec();
-  }
 }

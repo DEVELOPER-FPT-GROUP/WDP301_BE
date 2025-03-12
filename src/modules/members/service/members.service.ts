@@ -124,18 +124,16 @@ export class MembersService implements IMembersService {
     const memberIds = memberDTOs.map(member => member.memberId);
 
     const marriages = await this.marriagesService.getAllSpouses(memberIds);
+    const parentRelations = await this.parentChildRelationshipsService.findByParentIds(memberIds);
     const childRelations = await this.parentChildRelationshipsService.findByChildIds(memberIds);
 
     // Create lookup maps
-    const spouseMap = await this.createSpouseMap(marriages);  // This will return an array of SpouseDTOs
     const spouseMap = this.createSpouseMap(marriages);
     const childrenMap = this.createChildrenMap(parentRelations);
     const parentMap = await this.createParentMap(childRelations);
 
     // Assign spouse, children, and parent data
     return memberDTOs.map(memberDTO => {
-      // Assign an array of spouses to the memberDTO
-      memberDTO.spouses = spouseMap.get(memberDTO.memberId);
       memberDTO.spouse = spouseMap.get(memberDTO.memberId);
       memberDTO.children = childrenMap.get(memberDTO.memberId);
       memberDTO.parent = parentMap.get(memberDTO.memberId);
@@ -417,7 +415,6 @@ export class MembersService implements IMembersService {
     await this.accountsService.createAccount(createAccountDto);
   }
 
-  private async createSpouseMap(marriages: MarriageDTO[]): Promise<Map<string, SpouseDTO[]>> {
   /**
    * Creates a mapping of spouses, linking each member to their respective spouse.
    * @param marriages - An array of marriage relationships.
@@ -426,47 +423,24 @@ export class MembersService implements IMembersService {
   private createSpousesMap(marriages: MarriageDTO[]): Map<string, SpouseDTO[]> {
     const spouseMap = new Map<string, SpouseDTO[]>();
 
-    // Tập hợp tất cả các ID cần lấy thông tin thành viên
-    const memberIds = new Set<string>();
-    marriages.forEach(({ husbandId, wifeId }) => {
-      if (husbandId) memberIds.add(husbandId);
-      if (wifeId) memberIds.add(wifeId);
-    });
+    marriages.forEach(marriage => {
+      // Ensure the map contains an array of spouses for each husband
+      if (!spouseMap.has(marriage.husbandId)) {
+        spouseMap.set(marriage.husbandId, []);
+      }
+      // Add the wife to the husband's list of spouses
+      spouseMap.get(marriage.husbandId)?.push({ wifeId: marriage.wifeId });
 
-    // Lấy thông tin thành viên từ repository
-    const members = await this.membersRepository.findByIds(Array.from(memberIds));
-    const memberMap = new Map<string, MemberDTO>(members.map(member => [String(member._id), MemberDTO.map(member)]));
-
-    // Lấy danh sách con theo parentId
-    const childrenMap = await this.parentChildRelationshipsService.findChildrenByParentsId(Array.from(memberIds));
-
-    // Xây dựng spouse map
-    marriages.forEach(({ husbandId, wifeId }) => {
-      if (!husbandId || !wifeId) return; // Bỏ qua nếu thiếu ID
-
-      const husband = memberMap.get(husbandId);
-      const wife = memberMap.get(wifeId);
-
-      if (!husband || !wife) return; // Bỏ qua nếu không tìm thấy thông tin spouse
-
-      // Thêm wife vào danh sách spouse của husband
-      if (!spouseMap.has(husbandId)) spouseMap.set(husbandId, []);
-      spouseMap.get(husbandId)!.push({
-        wife,
-        children: childrenMap.get(husbandId) || []  // Luôn trả về mảng
-      });
-
-      // Thêm husband vào danh sách spouse của wife
-      if (!spouseMap.has(wifeId)) spouseMap.set(wifeId, []);
-      spouseMap.get(wifeId)!.push({
-        husband,
-        children: childrenMap.get(wifeId) || []  // Luôn trả về mảng
-      });
+      // Ensure the map contains an array of spouses for each wife
+      if (!spouseMap.has(marriage.wifeId)) {
+        spouseMap.set(marriage.wifeId, []);
+      }
+      // Add the husband to the wife's list of spouses
+      spouseMap.get(marriage.wifeId)?.push({ husbandId: marriage.husbandId });
     });
 
     return spouseMap;
   }
-
 
   /**
    * Creates a map linking each parent to their children.
@@ -499,54 +473,31 @@ export class MembersService implements IMembersService {
     const parentMap = new Map<string, ParentDTO>();
 
     for (const relation of childRelations) {
-      // Lấy thông tin thành viên cha/mẹ từ ID
-      const parent = await this.membersRepository.findById(relation.parentId);
-      if (!parent) continue;
+      // Retrieve the spouse (other parent) of the given parent ID
+      const spouse = await this.marriagesService.getSpouse(relation.parentId);
+      if (!spouse) continue;
 
-      // Tạo DTO cho parent
-      const parentDTOObject = MemberDTO.map(parent);
-
-      // Nếu chưa có ParentDTO cho childId, khởi tạo nó
+      // Initialize a ParentDTO object if the child is not already in the map
       if (!parentMap.has(relation.childId)) {
         parentMap.set(relation.childId, new ParentDTO());
       }
 
-      // Lấy ParentDTO của child
+      // Retrieve the existing ParentDTO for the child
       const parentDTO = parentMap.get(relation.childId)!;
 
-      // Lấy thông tin spouse để xác định cha/mẹ
-      const spouse = await this.marriagesService.getSpouse(relation.parentId);
-      if (!spouse) {
-        // Nếu không có spouse, chỉ có 1 phụ huynh
-        if (parent.gender === 'MALE') {
-          parentDTO.father = parentDTOObject;
-        } else {
-          parentDTO.mother = parentDTOObject;
-        }
-        continue;
-      }
-
-      // Xác định cha/mẹ dựa trên spouse data
-      const spouseData = await this.membersRepository.findById(
-        spouse.husbandId === relation.parentId ? spouse.wifeId : spouse.husbandId
-      );
-
-      if (spouseData) {
-        const spouseDTO = MemberDTO.map(spouseData);
-        if (parent.gender === 'MALE') {
-          parentDTO.father = parentDTOObject;
-          parentDTO.mother = spouseDTO;
-        } else {
-          parentDTO.mother = parentDTOObject;
-          parentDTO.father = spouseDTO;
-        }
-      } else {
-        // Nếu không tìm thấy spouse, chỉ có 1 phụ huynh
-        if (parent.gender === 'MALE') {
-          parentDTO.father = parentDTOObject;
-        } else {
-          parentDTO.mother = parentDTOObject;
-        }
+      // Determine father and mother based on spouse data
+      if (spouse.husbandId && spouse.wifeId) {
+        // Both husband and wife exist in the spouse data
+        parentDTO.fatherId = spouse.husbandId;
+        parentDTO.motherId = spouse.wifeId;
+      } else if (spouse.husbandId === relation.parentId) {
+        // If the given parent is the husband, assign wife as mother
+        parentDTO.fatherId = relation.parentId;
+        parentDTO.motherId = spouse.wifeId;
+      } else if (spouse.wifeId === relation.parentId) {
+        // If the given parent is the wife, assign husband as father
+        parentDTO.motherId = relation.parentId;
+        parentDTO.fatherId = spouse.husbandId;
       }
     }
 
@@ -561,7 +512,33 @@ export class MembersService implements IMembersService {
       throw new Error('Failed to create family leader');
     }
 
+    if (createdMember.isAlive) {
+      await this.createFamilyLeaderAccount(createdMember, createMemberDto);
+    }
+
     return createdMember;
+  }
+
+  private async createFamilyLeaderAccount(member: MemberDTO, createMemberDto: CreateMemberDto): Promise<void> {
+    if (!createMemberDto.username) {
+      throw new NotFoundException('Username is required');
+    }
+
+    const account = await this.accountsRepository.existsByUsername(createMemberDto.username);
+
+    if (account) {
+      throw new ConflictException('Username already exists');
+    }
+
+    const createAccountDto = Object.assign(new CreateAccountDto(), {
+      memberId: member.memberId,
+      username: createMemberDto.username,
+      passwordHash: createMemberDto.password,
+      email: createMemberDto.email,
+      isAdmin: true,
+    });
+
+    await this.accountsService.createAccount(createAccountDto);
   }
 
   /**
@@ -570,24 +547,17 @@ export class MembersService implements IMembersService {
    * @returns The member DTO with spouse and parent information.
    */
   async getMemberDetails(id: string): Promise<MemberDTO> {
-    // Lấy thông tin thành viên từ repository
     const member = await this.membersRepository.findById(id);
     if (!member) {
       throw new NotFoundException('Member not found');
     }
 
-    // Chuyển đổi sang DTO
+    // Convert member to DTO
     const memberDTO = MemberDTO.map(member);
 
-    // Lấy danh sách thành viên (chỉ 1 người)
-    const memberIds = [memberDTO.memberId];
+    // Fetch spouse details
+    const marriages = await this.marriagesService.getAllSpouses([memberDTO.memberId]);
 
-    // Lấy dữ liệu hôn nhân (hôn phối)
-    const marriages = await this.marriagesService.getAllSpouses(memberIds);
-
-    // Tạo map lookup cho spouse
-    const spouseMap = await this.createSpouseMap(marriages);
-    memberDTO.spouses = spouseMap.get(memberDTO.memberId) || [];
     // Create spouse map using this.createSpousesMap
     const spouseMap = this.createSpousesMap(marriages);
 
@@ -615,12 +585,15 @@ export class MembersService implements IMembersService {
       }
     }
 
-    // Lấy quan hệ cha mẹ - con cái
-    const childRelations = await this.parentChildRelationshipsService.findByChildIds(memberIds);
-
-    // Tạo map lookup cho parent
+    // Fetch parent-child relationships
+    const childRelations = await this.parentChildRelationshipsService.findByParentIds([memberDTO.memberId]);
     const parentMap = await this.createParentMap(childRelations);
-    memberDTO.parent = parentMap.get(memberDTO.memberId);
+
+    // Assign parent details if available
+    if (parentMap.has(memberDTO.memberId)) {
+      memberDTO.parent = parentMap.get(memberDTO.memberId);
+    }
+
     // Assign children details (id and full name)
     const childrenIds = this.createChildrenMap(childRelations).get(memberDTO.memberId);
     memberDTO.childDTOS = [];
