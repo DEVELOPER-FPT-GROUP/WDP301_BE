@@ -6,6 +6,8 @@ import { CreateChildDto } from '../dto/request/create-child.dto';
 import { Promise } from 'mongoose';
 import { SearchMemberDto } from '../dto/request/search-member.dto';
 import { PaginationDTO } from '../../../utils/pagination.dto';
+import { SearchAccountDto } from '../../accounts/dto/request/search-account.dto';
+import { AccountResponseDto } from '../../accounts/dto/response/account.dto';
 
 export interface IMembersService {
   createMember(createMemberDto: CreateMemberDto): Promise<MemberDTO>;
@@ -18,6 +20,7 @@ export interface IMembersService {
   createChild(createChildDto: CreateChildDto): Promise<MemberDTO | null>;
   createFamilyLeader(createMemberDto: CreateMemberDto): Promise<MemberDTO>;
   getMemberDetails(id: string): Promise<MemberDTO>;
-  removeMember(id: string): Promise<MemberDTO>
-  searchMembers(familyId: string, searchDto: SearchMemberDto): Promise<PaginationDTO<MemberDTO>>
+  removeMember(id: string): Promise<MemberDTO>;
+  searchMembers(familyId: string, searchDto: SearchMemberDto): Promise<PaginationDTO<MemberDTO>>;
+  searchAccounts(searchDto: SearchAccountDto): Promise<PaginationDTO<AccountResponseDto>>;
 }
