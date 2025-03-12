@@ -22,5 +22,4 @@ export interface IMembersService {
   getMemberDetails(id: string): Promise<MemberDTO>;
   removeMember(id: string): Promise<MemberDTO>;
   searchMembers(familyId: string, searchDto: SearchMemberDto): Promise<PaginationDTO<MemberDTO>>;
-  searchAccounts(searchDto: SearchAccountDto): Promise<PaginationDTO<AccountResponseDto>>;
 }

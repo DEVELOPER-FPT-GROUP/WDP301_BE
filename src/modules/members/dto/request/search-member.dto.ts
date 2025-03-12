@@ -12,6 +12,10 @@ export class SearchMemberDto {
   email?: string;
 
   @IsOptional()
+  @IsString()
+  familyId?: string;
+
+  @IsOptional()
   @Transform(({ value }) => value === 'true') // Chuyển đổi string 'true' thành boolean true
   @IsBoolean()
   isAlive?: boolean;

@@ -134,13 +134,4 @@ export class MembersController {
     const result = await this.membersService.removeMember(id);
     return ResponseDTO.success(result, 'Member deleted successfully');
   }
-
-  @Get('/accounts/search')
-  async searchAccounts(
-    @Query() searchDto: SearchAccountDto
-  ): Promise<ResponseDTO<PaginationDTO<AccountResponseDto>>> {
-    logger.http(`Received GET request to search accounts with filters: ${JSON.stringify(searchDto)}`);
-    const result = await this.membersService.searchAccounts(searchDto);
-    return ResponseDTO.success(result, 'Accounts retrieved successfully');
-  }
 }

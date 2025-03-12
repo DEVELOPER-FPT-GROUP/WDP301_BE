@@ -3,7 +3,7 @@ import { IMembersService } from './members.service.interface';
 import { CreateMemberDto } from '../dto/request/create-member.dto';
 import { MemberDTO } from '../dto/response/member.dto';
 import { MembersRepository } from '../repository/members.repository';
-import mongoose, { Promise } from 'mongoose';
+import { Promise } from 'mongoose';
 import { UpdateMemberDto } from '../dto/request/update-member.dto';
 import { FamiliesService } from '../../families/service/families.service';
 import { MarriagesService } from '../../marriages/service/marriages.service';
@@ -31,10 +31,6 @@ import { RELATIONSHIP_TYPES } from '../../../utils/message.utils';
 import { PaginationDTO } from '../../../utils/pagination.dto';
 import { SearchMemberDto } from '../dto/request/search-member.dto';
 import { AccountsRepository } from '../../accounts/repository/accounts.repository';
-import { ChildDTO } from '../dto/response/child.dto';
-import { SearchAccountDto } from '../../accounts/dto/request/search-account.dto';
-import { AccountResponseDto } from '../../accounts/dto/response/account.dto';
-import { AccountMapper } from '../../accounts/mapper/account.mapper';
 
 @Injectable()
 export class MembersService implements IMembersService {
@@ -132,32 +128,15 @@ export class MembersService implements IMembersService {
 
     // Create lookup maps
     const spouseMap = await this.createSpouseMap(marriages);  // This will return an array of SpouseDTOs
-    const spouseMap = this.createSpouseMap(marriages);
-    const childrenMap = this.createChildrenMap(parentRelations);
     const parentMap = await this.createParentMap(childRelations);
 
     // Assign spouse, children, and parent data
     return memberDTOs.map(memberDTO => {
       // Assign an array of spouses to the memberDTO
       memberDTO.spouses = spouseMap.get(memberDTO.memberId);
-      memberDTO.spouse = spouseMap.get(memberDTO.memberId);
-      memberDTO.children = childrenMap.get(memberDTO.memberId);
       memberDTO.parent = parentMap.get(memberDTO.memberId);
       return memberDTO;
     });
-  }
-
-  private createSpouseMap(marriages: MarriageDTO[]): Map<string, SpouseDTO> {
-    const spouseMap = new Map<string, SpouseDTO>();
-
-    marriages.forEach(marriage => {
-      // Maps husband to wife
-      spouseMap.set(marriage.husbandId, { wifeId: marriage.wifeId });
-      // Maps wife to husband
-      spouseMap.set(marriage.wifeId, { husbandId: marriage.husbandId });
-    });
-
-    return spouseMap;
   }
 
   /**
@@ -422,12 +401,6 @@ export class MembersService implements IMembersService {
   }
 
   private async createSpouseMap(marriages: MarriageDTO[]): Promise<Map<string, SpouseDTO[]>> {
-  /**
-   * Creates a mapping of spouses, linking each member to their respective spouse.
-   * @param marriages - An array of marriage relationships.
-   * @returns A Map where keys are member IDs and values are SpouseDTO objects.
-   */
-  private createSpousesMap(marriages: MarriageDTO[]): Map<string, SpouseDTO[]> {
     const spouseMap = new Map<string, SpouseDTO[]>();
 
     // Tập hợp tất cả các ID cần lấy thông tin thành viên
@@ -502,7 +475,7 @@ export class MembersService implements IMembersService {
   private async createParentMap(childRelations: ParentChildRelationshipDTO[]): Promise<Map<string, ParentDTO>> {
     const parentMap = new Map<string, ParentDTO>();
 
-    for (const relation of childRelations)  {
+    for (const relation of childRelations) {
       // Lấy thông tin thành viên cha/mẹ từ ID
       const parent = await this.membersRepository.findById(relation.parentId);
       if (!parent) continue;
@@ -574,24 +547,6 @@ export class MembersService implements IMembersService {
    * @returns The member DTO with spouse and parent information.
    */
   async getMemberDetails(id: string): Promise<MemberDTO> {
-
-    // Convert member to DTO
-    const memberDTO = await this.getMemberById(id);
-
-    // Fetch and assign spouse details
-    memberDTO.spouses = await this.getSpouseDetails(memberDTO);
-
-    // Fetch and assign parent-child relationships
-    const { parent, children } = await this.getParentChildDetails(memberDTO);
-    memberDTO.parent = parent;
-    memberDTO.childDTOS = children;
-
-    return memberDTO;
-  }
-
-  private async getSpouseDetails(memberDTO: MemberDTO): Promise<SpouseDTO[]> {
-    const marriages = await this.marriagesService.getAllSpouses([memberDTO.memberId]);
-=======
     // Lấy thông tin thành viên từ repository
     const member = await this.membersRepository.findById(id);
     if (!member) {
@@ -610,30 +565,6 @@ export class MembersService implements IMembersService {
     // Tạo map lookup cho spouse
     const spouseMap = await this.createSpouseMap(marriages);
     memberDTO.spouses = spouseMap.get(memberDTO.memberId) || [];
-    // Create spouse map using this.createSpousesMap
-
-    const spouseMap = this.createSpousesMap(marriages);
-
-    const spouses: SpouseDTO[] = [];
-    for (const spouse of (spouseMap.get(memberDTO.memberId) || [])) {
-      const spouseId = spouse.husbandId || spouse.wifeId;
-      if (spouseId) {
-        const fullName = await this.getFullName(spouseId);
-        if (memberDTO.gender === Gender.FEMALE) {
-          spouses.push({ husbandId: spouseId, fullName });
-        } else {
-          spouses.push({ wifeId: spouseId, fullName });
-        }
-      }
-    }
-    return spouses;
-  }
-
-  private async getParentChildDetails(memberDTO: MemberDTO): Promise<{ parent: ParentDTO | undefined; children: any[] }> {
-    const childRelations = await this.parentChildRelationshipsService.findByParentIds([memberDTO.memberId]);
-    const parentMap = await this.createParentMap(childRelations);
-
-    const parent = parentMap.get(memberDTO.memberId);
 
     // Lấy quan hệ cha mẹ - con cái
     const childRelations = await this.parentChildRelationshipsService.findByChildIds(memberIds);
@@ -641,78 +572,40 @@ export class MembersService implements IMembersService {
     // Tạo map lookup cho parent
     const parentMap = await this.createParentMap(childRelations);
     memberDTO.parent = parentMap.get(memberDTO.memberId);
-    // Assign children details (id and full name)
 
-    const childrenIds = this.createChildrenMap(childRelations).get(memberDTO.memberId);
-
-    const children = childrenIds ? await this.getChildrenDetails(childrenIds) : [];
-    return { parent, children };
+    return memberDTO;
   }
 
-  private async getChildrenDetails(childrenIds: string[]): Promise<ChildDTO[]> {
-    const children: ChildDTO[] = [];
-    for (const childId of childrenIds) {
-      const childMember = await this.getMemberById(childId);
-      if (childMember) {
-        const fullName = await this.getFullName(childMember.memberId);
-        children.push({
-          childId: childMember.memberId,
-          fullName
-        });
-      }
-    }
-    return children;
-  }
+  async searchMembers(familyId: string, searchDto: SearchMemberDto): Promise<PaginationDTO<MemberDTO>> {
+    const { page = 1, limit = 10 } = searchDto;
+    const filters: any = {};
 
-  private async getFullName(memberId: string): Promise<string> {
-    const member = await this.membersRepository.findById(memberId);
-    if (!member) {
-      throw new NotFoundException('Member not found');
-    }
-    return `${member.firstName} ${member.middleName || ''} ${member.lastName}`;
-  }
-  async searchMembers(
-    familyId: string,
-    searchDto: SearchMemberDto
-  ): Promise<PaginationDTO<MemberDTO>> {
-    const { page = 1, limit = 10, search, email, isAlive, gender } = searchDto;
-
-    const filters: any = { familyId }; // ✅ Ensure familyId is always applied
-
-    if (search) {
-      const regex = new RegExp(search, 'i');
+    if (searchDto.search) {
       filters.$or = [
-        { firstName: regex },
-        { middleName: regex },
-        { lastName: regex }
+        { firstName: new RegExp(searchDto.search, 'i') },
+        { middleName: new RegExp(searchDto.search, 'i') },
+        { lastName: new RegExp(searchDto.search, 'i') }
       ];
     }
 
-    if (email) {
-      filters.email = new RegExp(email, 'i');
+    if (searchDto.email) {
+      filters.email = new RegExp(searchDto.email, 'i');
     }
 
-    if (isAlive !== undefined) {
-      filters.isAlive = isAlive;
+    if (searchDto.isAlive !== undefined) {
+      filters.isAlive = searchDto.isAlive;
     }
 
-    if (gender) {
-      filters.gender = gender;
+    if (searchDto.gender) {
+      filters.gender = searchDto.gender;
     }
 
+    filters.familyId = searchDto.familyId;
     const { members, total } = await this.membersRepository.findByFilters(filters, page, limit);
-
-    // ✅ Return early if no members are found
-    if (members.length === 0) {
-      return PaginationDTO.create([], 0, page, limit);
-    }
-
-    // ✅ Map member entities to DTOs
-    const memberDTOs = members.map((member) => MemberDTO.map(member));
+    const memberDTOs = members.map(member => MemberDTO.map(member));
 
     return PaginationDTO.create(memberDTOs, total, page, limit);
   }
-
 
   /**
    * Soft deletes a member by updating the isDeleted field to true.
@@ -730,47 +623,4 @@ export class MembersService implements IMembersService {
     return MemberDTO.map(result);
   }
 
-  async searchAccounts(
-    searchDto: SearchAccountDto
-  ): Promise<PaginationDTO<AccountResponseDto>> {
-    const { page = 1, limit = 10, familyId, memberId, username, email, isAdmin } = searchDto;
-
-    // ✅ Get all members in the family
-    const familyMembers = await this.membersRepository.findMembersInFamily(familyId);
-
-    // Extract memberIds from familyMembers
-    const memberIds = familyMembers.map(member => String(member._id));
-
-    // ✅ Ensure accounts are only from members in the specified family
-    const filters: any = { memberId: { $in: memberIds.map(id => new mongoose.Types.ObjectId(id)) } };
-
-    if (memberId) {
-      console.log(memberId, memberIds.includes(memberId));
-      if (memberIds.includes(memberId)) {
-        filters.memberId = new mongoose.Types.ObjectId(memberId);
-      }
-    }
-
-    if (username) {
-      filters.username = new RegExp(username, 'i'); // Case-insensitive search
-    }
-
-    if (email) {
-      filters.email = new RegExp(email, 'i');
-    }
-
-    if (isAdmin !== undefined) {
-      filters.isAdmin = isAdmin;
-    }
-
-    // ✅ Fetch accounts filtered by the family members
-    const { accounts, total } = await this.accountsRepository.findByFilters(filters, page, limit);
-
-    if (accounts.length === 0) {
-      return PaginationDTO.create([], 0, page, limit);
-    }
-
-    const accountDTOs = accounts.map(account => AccountMapper.toResponseDto(account));
-    return PaginationDTO.create(accountDTOs, total, page, limit);
-  }
 }

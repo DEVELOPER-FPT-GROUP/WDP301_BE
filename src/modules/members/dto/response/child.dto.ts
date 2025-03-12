@@ -10,8 +10,4 @@ export class ChildDTO {
 
   }
 
-export class ChildDTO {
-  childId?: string;
-  fullName?: string;
-
 }
