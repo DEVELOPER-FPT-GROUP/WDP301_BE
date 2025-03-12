@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { IAccountService } from './accounts.service.interface';
 import { AccountsRepository } from '../repository/accounts.repository';
@@ -6,8 +6,6 @@ import { CreateAccountDto } from '../dto/request/create-account.dto';
 import { UpdateAccountDto } from '../dto/request/update-account.dto';
 import { AccountResponseDto } from '../dto/response/account.dto';
 import { AccountMapper } from '../mapper/account.mapper';
-import { CreateMemberDto } from '../../members/dto/request/create-member.dto';
-import { Promise } from 'mongoose';
 
 @Injectable()
 export class AccountsService implements IAccountService {
@@ -102,19 +100,4 @@ export class AccountsService implements IAccountService {
     if (!deletedAccount) throw new NotFoundException(`Account with ID ${id} not found`);
     return AccountMapper.toResponseDto(deletedAccount);
   }
-
-  async createFamilyLeaderAccount(createAccountDto: CreateAccountDto): Promise<AccountResponseDto> {
-    if (!createAccountDto.username) {
-      throw new NotFoundException('Username is required');
-    }
-
-    const isExistAccount = await this.accountsRepository.existsByUsername(createAccountDto.username);
-
-    if (isExistAccount) {
-      throw new ConflictException('Username already exists');
-    }
-
-    return await this.createAccount(createAccountDto)
-  }
-
 }

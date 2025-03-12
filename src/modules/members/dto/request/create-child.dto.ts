@@ -6,8 +6,8 @@ export class CreateChildDto {
   @IsString()
   parentId: string;
 
-  @IsNotEmpty()
-  @IsString()
+  @IsOptional()
+    @IsString()
   parentSpouseId: string;
 
   @IsNumber()

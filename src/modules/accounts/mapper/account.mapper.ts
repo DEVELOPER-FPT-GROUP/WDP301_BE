@@ -11,7 +11,7 @@ export class AccountMapper {
   static toEntity(dto: CreateAccountDto): Account {
     return {
       _id: new mongoose.Types.ObjectId(),
-      memberId: dto.memberId ? new mongoose.Types.ObjectId(dto.memberId): '', // ✅ Store as ObjectId
+      memberId: new mongoose.Types.ObjectId(dto.memberId), // ✅ Store as ObjectId
       username: dto.username,
       passwordHash: dto.passwordHash,
       email: dto.email,

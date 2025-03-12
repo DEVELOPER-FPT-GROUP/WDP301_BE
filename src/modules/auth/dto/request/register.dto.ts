@@ -6,19 +6,11 @@ export class RegisterDto {
     @IsString()
     familyName: string;
 
-    @IsOptional()
-    @IsString()
-    email?: string;
-
-    @IsOptional()
-    @IsString()
-    memberId?: string;
-
     @IsNotEmpty()
     @IsString()
     username: string;
 
     @IsNotEmpty()
     @IsString()
-    password: string
+    password: string;
 }

@@ -1,7 +1,7 @@
 import { IsNotEmpty, IsOptional, IsString, IsBoolean, IsEmail } from 'class-validator';
 
 export class CreateAccountDto {
-  @IsOptional()
+  @IsNotEmpty()
   @IsString()
   memberId: string;
 
