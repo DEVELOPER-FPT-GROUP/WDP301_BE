@@ -31,6 +31,8 @@ import { FaceDetectionService } from 'src/modules/ai-face-detection/service/face
 import { PaginationDTO } from '../../../utils/pagination.dto';
 import { SearchMemberDto } from '../dto/request/search-member.dto';
 import { winstonLogger as logger } from 'src/common/winston-logger';
+import { SearchAccountDto } from '../../accounts/dto/request/search-account.dto';
+import { AccountResponseDto } from '../../accounts/dto/response/account.dto';
 @Controller('members')
 @UseInterceptors(ClassSerializerInterceptor, LoggingInterceptor) // Enable auto-serialization
 export class MembersController {
@@ -114,8 +116,6 @@ export class MembersController {
     return ResponseDTO.success(result, 'Member retrieved successfully');
   }
 
-
-
   @Post('avatar')
   @UseInterceptors(FileInterceptor('file'))
   async testFaceDetection(@UploadedFile() file: MulterFile) {
@@ -133,5 +133,14 @@ export class MembersController {
   async removeMember(@Param('id') id: string): Promise<ResponseDTO<MemberDTO>> {
     const result = await this.membersService.removeMember(id);
     return ResponseDTO.success(result, 'Member deleted successfully');
+  }
+
+  @Get('/accounts/search')
+  async searchAccounts(
+    @Query() searchDto: SearchAccountDto
+  ): Promise<ResponseDTO<PaginationDTO<AccountResponseDto>>> {
+    logger.http(`Received GET request to search accounts with filters: ${JSON.stringify(searchDto)}`);
+    const result = await this.membersService.searchAccounts(searchDto);
+    return ResponseDTO.success(result, 'Accounts retrieved successfully');
   }
 }
