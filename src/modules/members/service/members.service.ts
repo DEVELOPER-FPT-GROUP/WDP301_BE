@@ -475,7 +475,7 @@ export class MembersService implements IMembersService {
   private async createParentMap(childRelations: ParentChildRelationshipDTO[]): Promise<Map<string, ParentDTO>> {
     const parentMap = new Map<string, ParentDTO>();
 
-    for (const relation of childRelations) {
+    for (const relation of childRelations)  {
       // Lấy thông tin thành viên cha/mẹ từ ID
       const parent = await this.membersRepository.findById(relation.parentId);
       if (!parent) continue;
