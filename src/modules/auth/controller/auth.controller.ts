@@ -31,8 +31,8 @@ export class AuthController {
     }
 
     @Post('register')
-    async register(@Body() registerDto: RegisterDto): Promise<ResponseDTO<MemberDTO>> {
-        const result = await this.authService.register(registerDto)
-        return ResponseDTO.success(result, 'Register successful');
+    async register(@Body() registerDto: RegisterDto): Promise<ResponseDTO<any>> {
+        await this.authService.register(registerDto)
+        return ResponseDTO.success(null, 'Register successful');
     }
 }

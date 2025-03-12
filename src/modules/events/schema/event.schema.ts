@@ -1,12 +1,13 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { HydratedDocument } from 'mongoose';
+import crypto from 'crypto';
 
-export type EventDocument = Event & Document;
+export type EventDocument = HydratedDocument<Event>;
 
-@Schema({ timestamps: { createdAt: true, updatedAt: true } })
+@Schema({ timestamps: { createdAt: 'createdAt', updatedAt: 'updatedAt' } })
 export class Event {
   @Prop({ required: true, unique: true, index: true })
-  eventId: string;
+  eventId: string; // Auto-generated
 
   @Prop({ required: true })
   createdBy: string;
@@ -29,16 +30,16 @@ export class Event {
   @Prop({ type: Date })
   endDate: Date;
 
-  @Prop({ enum: ['none', 'daily', 'weekly', 'monthly', 'yearly'] })
+  @Prop()
   recurrenceFrequency: string;
 
-  @Prop({ type: Number })
+  @Prop()
   interval: number;
 
   @Prop()
   byDay: string;
 
-  @Prop({ type: Number })
+  @Prop()
   byMonthDay: number;
 
   @Prop({ type: Date })
@@ -46,35 +47,20 @@ export class Event {
 
   @Prop()
   location: string;
+
+  @Prop({ type: Date, default: Date.now })
+  createdAt: Date;
+
+  @Prop({ type: Date, default: Date.now })
+  updatedAt: Date;
 }
 
 export const EventSchema = SchemaFactory.createForClass(Event);
 
-EventSchema.pre('validate', async function (next) {
+EventSchema.pre<EventDocument>('save', function (next) {
   if (!this.eventId) {
-    let isUnique = false;
-    let attempts = 0;
-
-    while (!isUnique && attempts < 5) { // Prevent infinite loops
-      const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-      const randomPart = Math.floor(1000 + Math.random() * 9000);
-      const generatedEventId = `EVT-${timestamp}-${randomPart}`;
-
-      // Check if this eventId already exists in the database
-      const existingEvent = await (this.constructor as any).findOne({ eventId: generatedEventId });
-
-      if (!existingEvent) {
-        this.eventId = generatedEventId;
-        isUnique = true;
-      }
-
-      attempts++;
-    }
-
-    if (!isUnique) {
-      return next(new Error('Failed to generate a unique eventId after multiple attempts.'));
-    }
+    const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    this.eventId = `EVENT-${timestamp}-${crypto.randomBytes(4).toString('hex')}`;
   }
-
   next();
 });

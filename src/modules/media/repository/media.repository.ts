@@ -42,4 +42,12 @@ export class MediaRepository {
       _id: result[index]._id,
     }));
   }
+
+  async findByIds(ids: string[]): Promise<Media[]> {
+    return this.mediaModel.find({ mediaId: { $in: ids } }).exec();
+  }
+  
+  async deleteMany(ids: string[]): Promise<void> {
+    await this.mediaModel.deleteMany({ mediaId: { $in: ids } }).exec();
+  }
 }

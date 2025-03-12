@@ -1,6 +1,7 @@
 import { CreateAccountDto } from '../dto/request/create-account.dto';
 import { UpdateAccountDto } from '../dto/request/update-account.dto';
 import { AccountResponseDto } from '../dto/response/account.dto';
+import { Promise } from 'mongoose';
 
 export interface IAccountService {
   createAccount(dto: CreateAccountDto): Promise<AccountResponseDto>;
@@ -14,4 +15,6 @@ export interface IAccountService {
   updateAccount(id: string, dto: UpdateAccountDto): Promise<AccountResponseDto>;
 
   deleteAccount(id: string): Promise<AccountResponseDto>;
+
+  createFamilyLeaderAccount(createAccountDto: CreateAccountDto): Promise<AccountResponseDto>;
 }
