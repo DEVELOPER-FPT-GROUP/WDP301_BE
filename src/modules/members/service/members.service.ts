@@ -147,12 +147,12 @@ export class MembersService implements IMembersService {
     if (!members.length) return null;
 
     const memberMap = new Map<string, any>();
-    const memberIds = members.map(m => String(m._id)); // Convert ObjectId to string
+    const memberIds = members.map(m => String(m._id));
 
     const marriages = await this.marriagesService.getAllSpouses(memberIds);
     const parentChildRelations = await this.parentChildRelationshipsService.findByChildIds(memberIds);
 
-    // Create spouse map (allowing multiple partners)
+    // Create spouse map (handling multiple partners)
     const spouseMap = new Map<string, { id: string, name: string }[]>();
     marriages.forEach(({ husbandId, wifeId }) => {
       const husband = members.find(m => String(m._id) === String(husbandId));
@@ -166,8 +166,10 @@ export class MembersService implements IMembersService {
       }
     });
 
-    // Create children map
+    // Create children map linked to both parents
+    const childParentMap = new Map<string, string[]>(); // Tracks child to parents mapping
     const childrenMap = new Map<string, { id: string, name: string, generation: number }[]>();
+
     parentChildRelations.forEach(({ parentId, childId }) => {
       const child = members.find(m => String(m._id) === String(childId));
       if (child) {
@@ -180,6 +182,12 @@ export class MembersService implements IMembersService {
           name: `${child.firstName} ${child.middleName || ''} ${child.lastName}`.trim(),
           generation: child.generation
         });
+
+        // Track child-parent relationships
+        if (!childParentMap.has(String(childId))) {
+          childParentMap.set(String(childId), []);
+        }
+        childParentMap.get(String(childId))!.push(parentKey);
       }
     });
 
@@ -198,15 +206,17 @@ export class MembersService implements IMembersService {
 
       if (spouseMap.has(memberData.id)) {
         spouseMap.get(memberData.id)!.forEach(spouse => {
+          // Retrieve only the children that belong to both the current member and this spouse
+          const sharedChildren = (childrenMap.get(memberData.id) || []).filter(child =>
+            childParentMap.has(child.id) &&
+            childParentMap.get(child.id)!.includes(spouse.id)
+          );
+
           memberData.relationships.push({
             partner: spouse,
             isMarried: true,
-            children: childrenMap.get(memberData.id) || []
+            children: sharedChildren.length ? sharedChildren : undefined
           });
-        });
-      } else if (childrenMap.has(memberData.id)) {
-        memberData.relationships.push({
-          children: childrenMap.get(memberData.id)
         });
       }
 
