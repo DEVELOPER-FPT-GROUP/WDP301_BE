@@ -31,8 +31,7 @@ import { FaceDetectionService } from 'src/modules/ai-face-detection/service/face
 import { PaginationDTO } from '../../../utils/pagination.dto';
 import { SearchMemberDto } from '../dto/request/search-member.dto';
 import { winstonLogger as logger } from 'src/common/winston-logger';
-import { SearchAccountDto } from '../../accounts/dto/request/search-account.dto';
-import { AccountResponseDto } from '../../accounts/dto/response/account.dto';
+
 @Controller('members')
 @UseInterceptors(ClassSerializerInterceptor, LoggingInterceptor) // Enable auto-serialization
 export class MembersController {

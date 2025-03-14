@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { MembersService } from './service/members.service';
 import { MembersController } from './controller/members.controller';
@@ -14,7 +14,7 @@ import { FaceDetectionService } from '../ai-face-detection/service/face-detectio
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: Member.name, schema: MemberSchema }]),
-    FamiliesModule,
+    forwardRef(() => FamiliesModule),
     MarriagesModule,
     ParentChildRelationshipsModule,
     RelationshipTypesModule,

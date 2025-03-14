@@ -110,33 +110,137 @@ export class MembersService implements IMembersService {
    * @param familyId - The unique identifier of the family.
    * @returns An array of MemberDTOs with spouse, parent, and children information.
    */
-  async findMembersInFamily(familyId: string): Promise<MemberDTO[]> {
-    // Fetch the family by ID
+  // async findMembersInFamily(familyId: string): Promise<MemberDTO[]> {
+  //   // Fetch the family by ID
+  //   const family = await this.familiesService.getFamilyById(familyId);
+  //   if (!family) return [];
+  //
+  //   // Fetch all members in the given family
+  //   const members = await this.membersRepository.findMembersInFamily(familyId);
+  //   if (!members.length) return [];
+  //
+  //   // Convert members to DTOs and extract member IDs
+  //   const memberDTOs = members.map(member => MemberDTO.map(member));
+  //   const memberIds = memberDTOs.map(member => member.memberId);
+  //
+  //   const marriages = await this.marriagesService.getAllSpouses(memberIds);
+  //   const childRelations = await this.parentChildRelationshipsService.findByChildIds(memberIds);
+  //
+  //   // Create lookup maps
+  //   const spouseMap = await this.createSpouseMap(marriages);  // This will return an array of SpouseDTOs
+  //   const parentMap = await this.createParentMap(childRelations);
+  //
+  //   // Assign spouse, children, and parent data
+  //   return memberDTOs.map(memberDTO => {
+  //     // Assign an array of spouses to the memberDTO
+  //     memberDTO.spouses = spouseMap.get(memberDTO.memberId);
+  //     memberDTO.parent = parentMap.get(memberDTO.memberId);
+  //     return memberDTO;
+  //   });
+  // }
+
+  async findMembersInFamily(familyId: string): Promise<any> {
     const family = await this.familiesService.getFamilyById(familyId);
-    if (!family) return [];
+    if (!family) return null;
 
-    // Fetch all members in the given family
     const members = await this.membersRepository.findMembersInFamily(familyId);
-    if (!members.length) return [];
+    if (!members.length) return null;
 
-    // Convert members to DTOs and extract member IDs
-    const memberDTOs = members.map(member => MemberDTO.map(member));
-    const memberIds = memberDTOs.map(member => member.memberId);
+    const memberMap = new Map<string, any>();
+    const memberIds = members.map(m => String(m._id)); // Convert ObjectId to string
 
     const marriages = await this.marriagesService.getAllSpouses(memberIds);
-    const childRelations = await this.parentChildRelationshipsService.findByChildIds(memberIds);
+    const parentChildRelations = await this.parentChildRelationshipsService.findByChildIds(memberIds);
 
-    // Create lookup maps
-    const spouseMap = await this.createSpouseMap(marriages);  // This will return an array of SpouseDTOs
-    const parentMap = await this.createParentMap(childRelations);
+    // Create spouse map (allowing multiple partners)
+    const spouseMap = new Map<string, { id: string, name: string }[]>();
+    marriages.forEach(({ husbandId, wifeId }) => {
+      const husband = members.find(m => String(m._id) === String(husbandId));
+      const wife = members.find(m => String(m._id) === String(wifeId));
+      if (husband && wife) {
+        if (!spouseMap.has(String(husbandId))) spouseMap.set(String(husbandId), []);
+        if (!spouseMap.has(String(wifeId))) spouseMap.set(String(wifeId), []);
 
-    // Assign spouse, children, and parent data
-    return memberDTOs.map(memberDTO => {
-      // Assign an array of spouses to the memberDTO
-      memberDTO.spouses = spouseMap.get(memberDTO.memberId);
-      memberDTO.parent = parentMap.get(memberDTO.memberId);
-      return memberDTO;
+        spouseMap.get(String(husbandId))!.push({ id: String(wifeId), name: `${wife.firstName} ${wife.middleName || ''} ${wife.lastName}`.trim() });
+        spouseMap.get(String(wifeId))!.push({ id: String(husbandId), name: `${husband.firstName} ${husband.middleName || ''} ${husband.lastName}`.trim() });
+      }
     });
+
+    // Create children map
+    const childrenMap = new Map<string, { id: string, name: string, generation: number }[]>();
+    parentChildRelations.forEach(({ parentId, childId }) => {
+      const child = members.find(m => String(m._id) === String(childId));
+      if (child) {
+        const parentKey = String(parentId);
+        if (!childrenMap.has(parentKey)) {
+          childrenMap.set(parentKey, []);
+        }
+        childrenMap.get(parentKey)!.push({
+          id: String(childId),
+          name: `${child.firstName} ${child.middleName || ''} ${child.lastName}`.trim(),
+          generation: child.generation
+        });
+      }
+    });
+
+    // Create member data structure
+    members.forEach(member => {
+      const memberData = {
+        id: String(member._id),
+        name: `${member.firstName} ${member.middleName || ''} ${member.lastName}`.trim(),
+        generation: member.generation,
+        relationships: [] as Array<{
+          partner?: { id: string, name: string },
+          isMarried?: boolean,
+          children?: { id: string, name: string, generation: number }[]
+        }>
+      };
+
+      if (spouseMap.has(memberData.id)) {
+        spouseMap.get(memberData.id)!.forEach(spouse => {
+          memberData.relationships.push({
+            partner: spouse,
+            isMarried: true,
+            children: childrenMap.get(memberData.id) || []
+          });
+        });
+      } else if (childrenMap.has(memberData.id)) {
+        memberData.relationships.push({
+          children: childrenMap.get(memberData.id)
+        });
+      }
+
+      memberMap.set(memberData.id, memberData);
+    });
+
+    const rootMember = members.find(m => m.generation === 0);
+    if (!rootMember) return null;
+
+    const visited = new Set<string>();
+
+    function constructHierarchy(memberId: string): any {
+      if (visited.has(memberId)) return null;
+      visited.add(memberId);
+
+      const memberData = memberMap.get(memberId);
+      if (!memberData) return null;
+
+      memberData.relationships = memberData.relationships.map(rel => {
+        if (rel.partner) {
+          rel.partner = { id: rel.partner.id, name: rel.partner.name };
+        }
+        if (rel.children) {
+          rel.children = rel.children
+            .map(child => constructHierarchy(child.id))
+            .filter(Boolean);
+        }
+        return rel;
+      }).filter(Boolean);
+
+      return memberData;
+    }
+
+    return constructHierarchy(String(rootMember._id));
   }
 
   /**

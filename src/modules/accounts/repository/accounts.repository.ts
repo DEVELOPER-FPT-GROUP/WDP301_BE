@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import mongoose from 'mongoose';
 import { Account, AccountDocument } from '../schema/account.schema';
+import { log } from 'winston';
 
 @Injectable()
 export class AccountsRepository {
@@ -31,6 +32,7 @@ export class AccountsRepository {
    * @returns The account document or null if not found.
    */
   async findById(id: string): Promise<Account | null> {
+    console.log('Find account by id: ', id);
     const objectId = new mongoose.Types.ObjectId(id);
     return this.accountModel.findOne({ _id: objectId }).exec();
   }
@@ -116,5 +118,21 @@ export class AccountsRepository {
     console.log("Accounts: ", accounts);
 
     return { accounts, total };
+  }
+
+  /**
+   * Counts the number of accounts created in a specific month and year.
+   * @param year - The year to filter accounts.
+   * @param month - The month to filter accounts (1-12).
+   * @returns The total count of accounts created in the given month.
+   */
+  async findAccountsByMonth(year: number, month: number): Promise<Account[]> {
+    // Calculate the first and last day of the given month
+    const startDate = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0)); // 1st day of the month
+    const endDate = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999)); // Last day of the month
+    console.log(startDate);
+    return this.accountModel.find({
+      createdAt: { $gte: startDate, $lte: endDate }
+    }).exec();
   }
 }

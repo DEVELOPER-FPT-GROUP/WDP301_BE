@@ -17,4 +17,6 @@ export interface IAccountService {
   deleteAccount(id: string): Promise<AccountResponseDto>;
 
   createFamilyLeaderAccount(createAccountDto: CreateAccountDto): Promise<AccountResponseDto>;
+
+  getTotalAccountsCreated(year: number, month: number): Promise<number>
 }
