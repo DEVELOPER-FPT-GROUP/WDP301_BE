@@ -14,6 +14,8 @@ import { AuthModule } from './modules/auth/auth.module';
 import { MulterModule } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { AiFaceDetectionModule } from './modules/ai-face-detection/ai-face-detection.module';
+import { OrdersModule } from './modules/orders/orders.module';
+import { TrackingsModule } from './modules/tracking/tracking.module';
 
 @Module({
   imports: [
@@ -40,7 +42,9 @@ import { AiFaceDetectionModule } from './modules/ai-face-detection/ai-face-detec
     FamilyHistoryRecordModule,
     AccountsModule,
     AuthModule,
-    AiFaceDetectionModule
+    AiFaceDetectionModule,
+    OrdersModule,
+    TrackingsModule
   ],
 })
 export class AppModule {}
