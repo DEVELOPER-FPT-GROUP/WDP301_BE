@@ -153,22 +153,36 @@ export class MembersService implements IMembersService {
     const parentChildRelations = await this.parentChildRelationshipsService.findByChildIds(memberIds);
 
     // Create spouse map (handling multiple partners)
-    const spouseMap = new Map<string, { id: string, name: string }[]>();
+    const spouseMap = new Map<string, { id: string, name: string, gender: string, isSingle: boolean, deleted?: boolean }[]>();
     marriages.forEach(({ husbandId, wifeId }) => {
       const husband = members.find(m => String(m._id) === String(husbandId));
       const wife = members.find(m => String(m._id) === String(wifeId));
+
       if (husband && wife) {
         if (!spouseMap.has(String(husbandId))) spouseMap.set(String(husbandId), []);
         if (!spouseMap.has(String(wifeId))) spouseMap.set(String(wifeId), []);
 
-        spouseMap.get(String(husbandId))!.push({ id: String(wifeId), name: `${wife.firstName} ${wife.middleName || ''} ${wife.lastName}`.trim() });
-        spouseMap.get(String(wifeId))!.push({ id: String(husbandId), name: `${husband.firstName} ${husband.middleName || ''} ${husband.lastName}`.trim() });
+        spouseMap.get(String(husbandId))!.push({
+          id: String(wifeId),
+          name: `${wife.firstName} ${wife.middleName || ''} ${wife.lastName}`.trim(),
+          gender: wife.gender,
+          isSingle: wife.isSingle,
+          deleted: wife.isDeleted
+        });
+
+        spouseMap.get(String(wifeId))!.push({
+          id: String(husbandId),
+          name: `${husband.firstName} ${husband.middleName || ''} ${husband.lastName}`.trim(),
+          gender: husband.gender,
+          isSingle: husband.isSingle,
+          deleted: husband.isDeleted
+        });
       }
     });
 
     // Create children map linked to both parents
-    const childParentMap = new Map<string, string[]>(); // Tracks child to parents mapping
-    const childrenMap = new Map<string, { id: string, name: string, generation: number }[]>();
+    const childParentMap = new Map<string, string[]>(); // Tracks child-to-parents mapping
+    const childrenMap = new Map<string, any[]>();
 
     parentChildRelations.forEach(({ parentId, childId }) => {
       const child = members.find(m => String(m._id) === String(childId));
@@ -180,7 +194,9 @@ export class MembersService implements IMembersService {
         childrenMap.get(parentKey)!.push({
           id: String(childId),
           name: `${child.firstName} ${child.middleName || ''} ${child.lastName}`.trim(),
-          generation: child.generation
+          generation: child.generation,
+          gender: child.gender,
+          isSingle: child.isSingle
         });
 
         // Track child-parent relationships
@@ -193,37 +209,56 @@ export class MembersService implements IMembersService {
 
     // Create member data structure
     members.forEach(member => {
+      if (member.isDeleted) return;
+
       const memberData = {
         id: String(member._id),
         name: `${member.firstName} ${member.middleName || ''} ${member.lastName}`.trim(),
+        gender: member.gender,
+        isSingle: member.isSingle,
         generation: member.generation,
         relationships: [] as Array<{
-          partner?: { id: string, name: string },
+          partner?: { id: string, name: string, gender: string, isSingle: boolean },
           isMarried?: boolean,
-          children?: { id: string, name: string, generation: number }[]
+          children?: { id: string, name: string, generation: number, gender: string, isSingle: boolean }[]
         }>
       };
 
+      let hasVisiblePartner = false;
       if (spouseMap.has(memberData.id)) {
         spouseMap.get(memberData.id)!.forEach(spouse => {
-          // Retrieve only the children that belong to both the current member and this spouse
           const sharedChildren = (childrenMap.get(memberData.id) || []).filter(child =>
             childParentMap.has(child.id) &&
             childParentMap.get(child.id)!.includes(spouse.id)
           );
 
-          memberData.relationships.push({
-            partner: spouse,
-            isMarried: true,
-            children: sharedChildren.length ? sharedChildren : undefined
-          });
+          if (!spouse.deleted) {
+            hasVisiblePartner = true;
+            memberData.relationships.push({
+              partner: spouse,
+              isMarried: true,
+              children: sharedChildren.length ? sharedChildren : undefined
+            });
+          } else if (sharedChildren.length > 0) {
+            // Partner is deleted, but children should remain in a separate object
+            memberData.relationships.push({
+              children: sharedChildren
+            });
+          }
+        });
+      }
+
+      // Remove "isMarried" if all partners are deleted
+      if (!hasVisiblePartner) {
+        memberData.relationships.forEach(rel => {
+          delete rel.isMarried;
         });
       }
 
       memberMap.set(memberData.id, memberData);
     });
 
-    const rootMember = members.find(m => m.generation === 0);
+    const rootMember = members.find(m => m.generation === 0 && !m.isDeleted);
     if (!rootMember) return null;
 
     const visited = new Set<string>();
@@ -237,7 +272,12 @@ export class MembersService implements IMembersService {
 
       memberData.relationships = memberData.relationships.map(rel => {
         if (rel.partner) {
-          rel.partner = { id: rel.partner.id, name: rel.partner.name };
+          rel.partner = {
+            id: rel.partner.id,
+            name: rel.partner.name,
+            gender: rel.partner.gender,
+            isSingle: rel.partner.isSingle
+          };
         }
         if (rel.children) {
           rel.children = rel.children
