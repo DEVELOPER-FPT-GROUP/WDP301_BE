@@ -153,7 +153,7 @@ export class MembersService implements IMembersService {
     const parentChildRelations = await this.parentChildRelationshipsService.findByChildIds(memberIds);
 
     // Create spouse map (handling multiple partners)
-    const spouseMap = new Map<string, { id: string, name: string, gender: string, isSingle: boolean, deleted?: boolean }[]>();
+    const spouseMap = new Map<string, { id: string, name: string, gender: string, isSingle: boolean, isAlive: boolean, dateOfBirth: string, dateOfDeath: string | null, deleted?: boolean }[]>();
     marriages.forEach(({ husbandId, wifeId }) => {
       const husband = members.find(m => String(m._id) === String(husbandId));
       const wife = members.find(m => String(m._id) === String(wifeId));
@@ -167,6 +167,9 @@ export class MembersService implements IMembersService {
           name: `${wife.firstName} ${wife.middleName || ''} ${wife.lastName}`.trim(),
           gender: wife.gender,
           isSingle: wife.isSingle,
+          isAlive: wife.isAlive,
+          dateOfBirth: wife.dateOfBirth ? new Date(wife.dateOfBirth).toISOString() : '',
+          dateOfDeath: wife.dateOfDeath ? new Date(wife.dateOfDeath).toISOString() : '',
           deleted: wife.isDeleted
         });
 
@@ -175,6 +178,9 @@ export class MembersService implements IMembersService {
           name: `${husband.firstName} ${husband.middleName || ''} ${husband.lastName}`.trim(),
           gender: husband.gender,
           isSingle: husband.isSingle,
+          isAlive: husband.isAlive,
+          dateOfBirth: husband.dateOfBirth ? new Date(husband.dateOfBirth).toISOString() : '',
+          dateOfDeath: husband.dateOfDeath ? new Date(husband.dateOfDeath).toISOString() : '',
           deleted: husband.isDeleted
         });
       }
@@ -184,20 +190,31 @@ export class MembersService implements IMembersService {
     const childParentMap = new Map<string, string[]>(); // Tracks child-to-parents mapping
     const childrenMap = new Map<string, any[]>();
 
-    parentChildRelations.forEach(({ parentId, childId }) => {
+    // Store birthOrder information from parentChildRelations
+    const birthOrderMap = new Map<string, number>();
+
+    parentChildRelations.forEach(({ parentId, childId, birthOrder }) => {
       const child = members.find(m => String(m._id) === String(childId));
       if (child) {
         const parentKey = String(parentId);
         if (!childrenMap.has(parentKey)) {
           childrenMap.set(parentKey, []);
         }
+
         childrenMap.get(parentKey)!.push({
           id: String(childId),
           name: `${child.firstName} ${child.middleName || ''} ${child.lastName}`.trim(),
           generation: child.generation,
           gender: child.gender,
-          isSingle: child.isSingle
+          isSingle: child.isSingle,
+          isAlive: child.isAlive,
+          dateOfBirth: child.dateOfBirth ? new Date(child.dateOfBirth).toISOString() : '',
+          dateOfDeath: child.dateOfDeath ? new Date(child.dateOfDeath).toISOString() : '',
+          birthOrder: birthOrder || 0 // Default birthOrder to 0 if missing
         });
+
+        // Store birth order
+        birthOrderMap.set(String(childId), birthOrder || 0);
 
         // Track child-parent relationships
         if (!childParentMap.has(String(childId))) {
@@ -205,6 +222,11 @@ export class MembersService implements IMembersService {
         }
         childParentMap.get(String(childId))!.push(parentKey);
       }
+    });
+
+    // **Sort children by birthOrder**
+    childrenMap.forEach((children, parentId) => {
+      children.sort((a, b) => (a.birthOrder - b.birthOrder));
     });
 
     // Create member data structure
@@ -216,21 +238,33 @@ export class MembersService implements IMembersService {
         name: `${member.firstName} ${member.middleName || ''} ${member.lastName}`.trim(),
         gender: member.gender,
         isSingle: member.isSingle,
+        isAlive: member.isAlive,
+        dateOfBirth: member.dateOfBirth ? new Date(member.dateOfBirth).toISOString() : '',
+        dateOfDeath: member.dateOfDeath ? new Date(member.dateOfDeath).toISOString() : '',
         generation: member.generation,
         relationships: [] as Array<{
-          partner?: { id: string, name: string, gender: string, isSingle: boolean },
+          partner?: { id: string, name: string, gender: string, isSingle: boolean, isAlive: boolean, dateOfBirth: string, dateOfDeath: string | null },
           isMarried?: boolean,
-          children?: { id: string, name: string, generation: number, gender: string, isSingle: boolean }[]
+          children?: { id: string, name: string, generation: number, gender: string, isSingle: boolean, isAlive: boolean, dateOfBirth: string, dateOfDeath: string | null, birthOrder: number }[]
         }>
       };
 
       let hasVisiblePartner = false;
       if (spouseMap.has(memberData.id)) {
         spouseMap.get(memberData.id)!.forEach(spouse => {
-          const sharedChildren = (childrenMap.get(memberData.id) || []).filter(child =>
+          let sharedChildren = (childrenMap.get(memberData.id) || []).filter(child =>
             childParentMap.has(child.id) &&
             childParentMap.get(child.id)!.includes(spouse.id)
           );
+
+          // Attach birthOrder from birthOrderMap
+          sharedChildren = sharedChildren.map(child => ({
+            ...child,
+            birthOrder: birthOrderMap.get(child.id) || 0
+          }));
+
+          // Sort children by birthOrder before adding to relationships
+          sharedChildren.sort((a, b) => a.birthOrder - b.birthOrder);
 
           if (!spouse.deleted) {
             hasVisiblePartner = true;
@@ -276,12 +310,19 @@ export class MembersService implements IMembersService {
             id: rel.partner.id,
             name: rel.partner.name,
             gender: rel.partner.gender,
-            isSingle: rel.partner.isSingle
+            isSingle: rel.partner.isSingle,
+            isAlive: rel.partner.isAlive,
+            dateOfBirth: rel.partner.dateOfBirth,
+            dateOfDeath: rel.partner.dateOfDeath
           };
         }
         if (rel.children) {
           rel.children = rel.children
-            .map(child => constructHierarchy(child.id))
+            .map(child => ({
+              ...constructHierarchy(child.id),
+              birthOrder: birthOrderMap.get(child.id) || 0
+            }))
+            .sort((a, b) => a.birthOrder - b.birthOrder)
             .filter(Boolean);
         }
         return rel;
@@ -379,7 +420,7 @@ export class MembersService implements IMembersService {
    * @returns The newly created child as a MemberDTO, or null if the member or spouse does not exist.
    */
   async createChild(createChildDto: CreateChildDto): Promise<MemberDTO | null> {
-    const { parentId, parentSpouseId } = createChildDto;
+    const { parentId, parentSpouseId, dateOfBirth } = createChildDto;
 
     if (parentId === parentSpouseId) {
       throw new NotFoundException('Parent and spouse cannot be the same person');
@@ -409,14 +450,48 @@ export class MembersService implements IMembersService {
       }
     }
 
+    // Fetch all siblings (children of the same parents)
+    let siblings = await this.parentChildRelationshipsService.findByParentIds([parentId]);
+
+    if (parentSpouseId) {
+      const spouseChildren = await this.parentChildRelationshipsService.findByParentIds([parentSpouseId]);
+      siblings = siblings.concat(spouseChildren);
+    }
+
+    // Remove duplicates in case both parents were queried
+    const siblingIds = new Set(siblings.map(s => s.childId));
+    siblings = siblings.filter(s => siblingIds.has(s.childId));
+
+    // Retrieve full sibling details (including dateOfBirth)
+    const siblingMembers = await this.membersRepository.findByIds([...siblingIds]);
+
+    // Sort siblings by `dateOfBirth`
+    siblingMembers.sort((a, b) => {
+      const dateA = new Date(a.dateOfBirth).getTime();
+      const dateB = new Date(b.dateOfBirth).getTime();
+      return dateA - dateB;
+    });
+
+    // Find the correct birth order for the new child
+    let birthOrder = 1;
+    if (dateOfBirth) {
+      const childBirthTime = new Date(dateOfBirth).getTime();
+      birthOrder = siblingMembers.filter(sibling => new Date(sibling.dateOfBirth || '9999-12-31').getTime() < childBirthTime).length + 1;
+    } else {
+      // If dateOfBirth is missing, assign as the last born
+      birthOrder = siblingMembers.length + 1;
+    }
+
+    // Create new child
     const createMemberDto = this.buildCreateChildMemberDto(parent, createChildDto);
     const child = await this.createMember(createMemberDto);
     if (!child) return null;
 
+    // Store parent-child relationships with generated birthOrder
     if (parentSpouse) {
-      await this.createParentChildRelationships(parent, parentSpouse, child, createChildDto.birthOrder);
+      await this.createParentChildRelationships(parent, parentSpouse, child, birthOrder);
     } else {
-      await this.createSingleParentChildRelationship(parent, child, createChildDto.birthOrder);
+      await this.createSingleParentChildRelationship(parent, child, birthOrder);
     }
 
     if (child.isAlive) {
@@ -425,7 +500,6 @@ export class MembersService implements IMembersService {
 
     return child;
   }
-
 
   private buildCreateChildMemberDto(parent: MemberDTO, createChildDto: CreateChildDto): CreateMemberDto {
     return Object.assign(new CreateMemberDto(), {

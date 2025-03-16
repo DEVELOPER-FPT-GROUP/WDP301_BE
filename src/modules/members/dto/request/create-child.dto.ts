@@ -10,9 +10,6 @@ export class CreateChildDto {
   @IsString()
   parentSpouseId: string;
 
-  @IsNumber()
-  birthOrder: number;
-
   @IsNotEmpty()
   firstName: string;
 
@@ -23,7 +20,6 @@ export class CreateChildDto {
   @IsNotEmpty()
   lastName: string;
 
-  @IsOptional()
   @IsDateString()
   dateOfBirth?: Date;
 
