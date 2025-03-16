@@ -47,4 +47,8 @@ export class FamiliesRepository {
 
     return { families, total };
   }
+
+  async findByAdminAccountId(adminAccountId: string): Promise<Family | null> {
+    return this.familyModel.findOne({ adminAccountId }).exec();
+  }
 }

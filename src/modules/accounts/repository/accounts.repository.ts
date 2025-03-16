@@ -89,12 +89,12 @@ export class AccountsRepository {
 
   /**
    * Updates the refresh token for an account (Used for token rotation).
-   * @param memberId - The unique member ID.
+   * @param accountId - The unique accountId ID.
    * @param refreshToken - The new refresh token, or `null` to remove it.
    */
-  async updateRefreshToken(memberId: string, refreshToken: string | null): Promise<void> {
+  async updateRefreshToken(accountId: string, refreshToken: string | null): Promise<void> {
     await this.accountModel
-      .findOneAndUpdate({ memberId: new mongoose.Types.ObjectId(memberId) }, { refreshToken })
+      .findOneAndUpdate({ _id: new mongoose.Types.ObjectId(accountId) }, { refreshToken })
       .exec();
   }
 

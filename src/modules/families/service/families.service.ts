@@ -69,4 +69,12 @@ export class FamiliesService implements IFamiliesService {
 
     return result;
   }
+
+  async getFamilyByAdminAccountId(id: string): Promise<FamilyDTO> {
+    const family = await this.familiesRepository.findByAdminAccountId(id);
+    if (!family) {
+      throw new NotFoundException('Family not found');
+    }
+    return FamilyDTO.map(family);
+  }
 }
