@@ -1,5 +1,6 @@
 import {
-  Controller, Get, Post, Put, Delete, Param, Body, Patch, UseInterceptors
+  Controller, Get, Post, Put, Delete, Param, Body, Patch, UseInterceptors,
+  Query
 } from '@nestjs/common';
 import { LoggingInterceptor } from 'src/common/interceptors/logging.interceptor';
 import { winstonLogger as logger } from 'src/common/winston-logger';
@@ -8,12 +9,22 @@ import { CreateAccountDto } from '../dto/request/create-account.dto';
 import { UpdateAccountDto } from '../dto/request/update-account.dto';
 import { ResponseDTO } from 'src/utils/response.dto';
 import { AccountResponseDto } from '../dto/response/account.dto';
+import { PaginationDTO } from 'src/utils/pagination.dto';
+import { SearchAccountDto } from '../dto/request/search-account.dto';
 
 @UseInterceptors(LoggingInterceptor) // ✅ Apply logging interceptor
 @Controller('accounts')
 export class AccountsController {
-  constructor(private readonly accountsService: AccountsService) {}
+  constructor(private readonly accountsService: AccountsService) { }
 
+  @Get('')
+  async getAccountsWithPagination(
+    @Query() searchDto: SearchAccountDto
+  ): Promise<ResponseDTO<PaginationDTO<AccountResponseDto>>> {
+    logger.http(`Received GET request to get family history records for Family ID`);
+    const result = await this.accountsService.getAccountsWithPagination(searchDto);
+    return ResponseDTO.success(result, 'Accounts Records retrieved successfully');
+  }
   /**
    * Create a new account
    */
@@ -27,7 +38,7 @@ export class AccountsController {
   /**
    * Get all accounts
    */
-  @Get()
+  @Get('/all')
   async getAllAccounts(): Promise<ResponseDTO<AccountResponseDto[]>> {
     logger.http(`Received GET request to fetch all accounts`);
     const result = await this.accountsService.getAllAccounts();
@@ -57,7 +68,7 @@ export class AccountsController {
   /**
    * Update an account by ID
    */
-  @Patch(':id')
+  @Put(':id')
   async updateAccount(@Param('id') id: string, @Body() updateAccountDto: UpdateAccountDto): Promise<ResponseDTO<AccountResponseDto>> {
     logger.http(`Received PATCH request to update account with ID: ${id}`);
     const result = await this.accountsService.updateAccount(id, updateAccountDto);

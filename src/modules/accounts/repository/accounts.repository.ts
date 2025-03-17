@@ -6,7 +6,7 @@ import { Account, AccountDocument } from '../schema/account.schema';
 
 @Injectable()
 export class AccountsRepository {
-  constructor(@InjectModel(Account.name) private readonly accountModel: Model<AccountDocument>) {}
+  constructor(@InjectModel(Account.name) private readonly accountModel: Model<AccountDocument>) { }
 
   /**
    * Creates a new account in the database.
@@ -116,5 +116,17 @@ export class AccountsRepository {
     console.log("Accounts: ", accounts);
 
     return { accounts, total };
+  }
+
+
+  async findAndCount(filters: any, page: number, limit: number): Promise<{ records: Account[]; total: number }> {
+    const skip = (page - 1) * limit;
+
+    const [records, total] = await Promise.all([
+      this.accountModel.find(filters).skip(skip).limit(limit).exec(),
+      this.accountModel.countDocuments(filters).exec()
+    ]);
+
+    return { records, total };
   }
 }

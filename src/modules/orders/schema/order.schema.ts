@@ -4,15 +4,19 @@ import { HydratedDocument, Schema as MongooseSchema } from 'mongoose';
 export type OrderDocument = HydratedDocument<Order>;
 
 export enum SubscriptionType {
-  STANDARD = 'standard',
-  PREMIUM = 'premium',
+  SIX_PEOPLE = "six_people",
+  FIFTEEN_PEOPLE = "fifteen_people",
+  THIRTY_PEOPLE = "thirty_people",
+  FIFTY_PEOPLE = "fifty_people",
+  NO_LIMIT = "no_limit",
 }
 
+
 export enum SubscriptionStatus {
-  PENDING = 'pending',       // Chờ thanh toán hoặc xử lý
-  ACTIVE = 'active',         // Đã kích hoạt subscription
-  EXPIRED = 'expired',       // Hết hạn
-  CANCELLED = 'cancelled',   // Đã hủy đăng ký
+  PENDING = 'pending',
+  ACTIVE = 'active',
+  EXPIRED = 'expired',
+  CANCELLED = 'cancelled',
 }
 
 @Schema({ timestamps: true })
@@ -22,28 +26,30 @@ export class Order {
   @Prop({ required: true })
   fullName: string;
 
-  @Prop({ required: true, unique: true })
+  @Prop({ required: true })
   email: string;
 
   @Prop({ required: true })
   phoneNumber: string;
 
-  @Prop({ 
-    type: String, 
-    enum: SubscriptionType, 
-    default: SubscriptionType.STANDARD 
+  @Prop({ required: true })
+  transactionId: string;
+
+  @Prop({
+    type: String,
+    enum: SubscriptionType,
   })
   subscription: SubscriptionType;
 
   @Prop({ required: true })
-  price: number; 
+  price: number;
 
-  @Prop({ 
-    type: String, 
-    enum: SubscriptionStatus, 
-    default: SubscriptionStatus.PENDING 
+  @Prop({
+    type: String,
+    enum: SubscriptionStatus,
+    default: SubscriptionStatus.PENDING
   })
-  status: SubscriptionStatus; 
+  status: SubscriptionStatus;
 
   @Prop({ default: Date.now })
   createdAt: Date;

@@ -14,10 +14,14 @@ export class CreateOrderDto {
   @IsNotEmpty()
   phoneNumber: string;
 
+  @IsString()
+  @IsNotEmpty()
+  transactionId: string;
+
   @IsEnum(SubscriptionType)
+  @IsNotEmpty()
   subscription: SubscriptionType;
 
   @IsNotEmpty()
   price: number;
-
 }
