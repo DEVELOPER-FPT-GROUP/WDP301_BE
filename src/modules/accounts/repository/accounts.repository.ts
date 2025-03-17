@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import mongoose from 'mongoose';
 import { Account, AccountDocument } from '../schema/account.schema';
+import { Role } from '../../../utils/enum';
 
 @Injectable()
 export class AccountsRepository {
@@ -145,5 +146,9 @@ export class AccountsRepository {
     return this.accountModel.find({
       createdAt: { $gte: startDate, $lte: endDate }
     }).exec();
+  }
+
+  async findAdminAccount(): Promise<Account | null> {
+    return this.accountModel.findOne({ role: Role.SYSTEM_ADMIN }).exec();
   }
 }

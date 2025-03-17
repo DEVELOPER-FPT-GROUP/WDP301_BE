@@ -18,6 +18,7 @@ export class AccountMapper {
       isAdmin: dto.isAdmin || false,
       createdAt: new Date(),
       updatedAt: new Date(),
+      role: dto.role || 'family_member',
     } as Account;
   }
 

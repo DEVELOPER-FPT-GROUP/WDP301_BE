@@ -8,7 +8,7 @@ import { UpdateMemberDto } from '../dto/request/update-member.dto';
 import { FamiliesService } from '../../families/service/families.service';
 import { MarriagesService } from '../../marriages/service/marriages.service';
 import { CreateMarriageDto } from '../../marriages/dto/request/create-marriage.dto';
-import { Gender } from '../../../utils/enum';
+import { Gender, Role } from '../../../utils/enum';
 import { CreateSpouseDto } from '../dto/request/create-spouse.dto';
 import { CreateChildDto } from '../dto/request/create-child.dto';
 import {
@@ -68,6 +68,7 @@ export class MembersService implements IMembersService {
         // Generates a unique username based on the child's name
         username: DataUtils.generateUniqueUsername(createdMember.firstName, createdMember.middleName || '', createdMember.lastName),
         passwordHash: '123456', // Default password (should be securely managed)
+        role: Role.FAMILY_MEMBER
       });
       await this.accountsService.createAccount(createAccountDto);
     }
@@ -475,9 +476,10 @@ export class MembersService implements IMembersService {
       username: DataUtils.generateUniqueUsername(
         spouse.firstName,
         spouse.middleName || '',
-        spouse.lastName
+        spouse.lastName,
       ),
       passwordHash: '123456',
+      role: Role.FAMILY_MEMBER
     });
 
     await this.accountsService.createAccount(createAccountDto);
@@ -660,6 +662,7 @@ export class MembersService implements IMembersService {
       // Generates a unique username based on the child's name
       username: DataUtils.generateUniqueUsername(child.firstName, child.middleName || '', child.lastName),
       passwordHash: '123456', // Default password (should be securely managed)
+      role: Role.FAMILY_MEMBER
     });
 
     // Calls the account service to create the account

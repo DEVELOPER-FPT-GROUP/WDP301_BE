@@ -10,10 +10,38 @@ import { CreateMemberDto } from '../../members/dto/request/create-member.dto';
 import { Promise } from 'mongoose';
 import { SearchAccountDto } from '../dto/request/search-account.dto';
 import { PaginationDTO } from 'src/utils/pagination.dto';
+import { Role } from '../../../utils/enum';
 
 @Injectable()
 export class AccountsService implements IAccountService {
-  constructor(private readonly accountsRepository: AccountsRepository) { }
+  constructor(private readonly accountsRepository: AccountsRepository) {
+    this.ensureAdminAccount(); // Ensure admin account on service initialization
+  }
+
+  /**
+   * Ensures an admin account exists; if not, it creates one.
+   */
+  private async ensureAdminAccount(): Promise<void> {
+    const existingAdmin = await this.accountsRepository.findAdminAccount();
+
+    if (!existingAdmin) {
+      const adminAccountDto: CreateAccountDto = {
+        username: 'admin',
+        passwordHash: "admin",
+        email: 'admin@example.com', // Optional
+        isAdmin: true,
+        role: Role.SYSTEM_ADMIN,
+        memberId: "",
+      };
+
+      try {
+        await this.createAccount(adminAccountDto);
+      } catch (error) {
+        console.log(error);
+      }
+    }
+  }
+
   async getAccountsWithPagination(searchDto: SearchAccountDto): Promise<PaginationDTO<AccountResponseDto>> {
     const { page = 1, limit = 10, search, isAdmin } = searchDto;
 
