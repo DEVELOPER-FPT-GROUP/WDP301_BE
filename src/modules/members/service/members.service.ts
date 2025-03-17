@@ -866,7 +866,7 @@ export class MembersService implements IMembersService {
       filters.gender = searchDto.gender;
     }
 
-    filters.familyId = searchDto.familyId;
+    filters.familyId = familyId;
     const { members, total } = await this.membersRepository.findByFilters(filters, page, limit);
     const memberDTOs = members.map(member => MemberDTO.map(member));
 
