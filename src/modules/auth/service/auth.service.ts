@@ -18,6 +18,8 @@ import { CreateFamilyDto } from '../../families/dto/request/create-family.dto';
 import { FamiliesService } from '../../families/service/families.service';
 import { AccountsService } from '../../accounts/service/accounts.service';
 import { CreateAccountDto } from '../../accounts/dto/request/create-account.dto';
+import { Role } from '../../../utils/enum';
+import { FamiliesRepository } from '../../families/repository/families.repository';
 
 @Injectable()
 export class AuthService implements IAuthService {
@@ -30,6 +32,7 @@ export class AuthService implements IAuthService {
       private memberService: MembersService,
       private familiesService: FamiliesService,
       private accountsService: AccountsService,
+      private familiesRepository: FamiliesRepository
     ) {}
 
     async validateUser(username: string, password: string): Promise<AccountResponseDto | null> {
@@ -42,6 +45,7 @@ export class AuthService implements IAuthService {
 
     async login(loginDto: LoginDto): Promise<AuthResponseDto> {
         const account = await this.accountsRepository.findByUsername(loginDto.username);
+
         if (!account || !(await bcrypt.compare(loginDto.password, account.passwordHash))) {
             throw new NotFoundException('Your username or password is incorrect');
         }
@@ -57,14 +61,14 @@ export class AuthService implements IAuthService {
 
     private async generateToken(account: Account, ttl: string): Promise<string> {
         const jti = crypto.randomUUID(); // Unique token ID
-        const family = await this.familiesService.getFamilyByAdminAccountId(String(account._id));
+        const family = await this.familiesRepository.findByAdminAccountId(String(account._id));
 
         const payload = {
             username: account.username,
-            memberId: account.memberId,
-            familyId: family.familyId,
+            memberId: account.memberId ? account.memberId : null,
+            familyId: family ? String(family._id) : null,
             jti,
-            role: account.isAdmin ? 'admin' : 'member',
+            role: account.role,
         };
 
         return this.jwtService.sign(payload, { expiresIn: ttl });
@@ -109,7 +113,8 @@ export class AuthService implements IAuthService {
             memberId: registerDto.memberId || '',
             username: registerDto.username,
             passwordHash: registerDto.password,
-            email: registerDto.email || ''
+            email: registerDto.email || '',
+            role: Role.FAMILY_LEADER
         }
 
         const account = await this.accountsService.createFamilyLeaderAccount(createAccountDto);

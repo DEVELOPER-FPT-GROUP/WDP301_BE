@@ -31,6 +31,9 @@ export class Account {
 
   @Prop()
   refreshToken: string;
+
+  @Prop()
+  role: string;
 }
 
 export const AccountSchema = SchemaFactory.createForClass(Account);

@@ -1,4 +1,5 @@
-import { IsNotEmpty, IsOptional, IsString, IsBoolean, IsEmail } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, IsBoolean, IsEmail, IsEnum } from 'class-validator';
+import { Role } from '../../../../utils/enum';
 
 export class CreateAccountDto {
   @IsOptional()
@@ -20,4 +21,7 @@ export class CreateAccountDto {
   @IsOptional()
   @IsBoolean()
   isAdmin?: boolean;
+
+  @IsEnum(Role)
+  role: string;
 }
