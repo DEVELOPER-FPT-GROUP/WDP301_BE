@@ -3,6 +3,7 @@ import { SearchAccountDto } from '../dto/request/search-account.dto';
 import { UpdateAccountDto } from '../dto/request/update-account.dto';
 import { AccountResponseDto } from '../dto/response/account.dto';
 import { Promise } from 'mongoose';
+import { PaginationDTO } from '../../../utils/pagination.dto';
 
 export interface IAccountService {
   createAccount(dto: CreateAccountDto): Promise<AccountResponseDto>;

@@ -489,7 +489,7 @@ export class MembersService implements IMembersService {
    * @returns The newly created child as a MemberDTO, or null if the member or spouse does not exist.
    */
   async createChild(createChildDto: CreateChildDto, files?: MulterFile[]): Promise<MemberDTO | null> {
-    const { parentId, parentSpouseId, dateOfBirth } = createChildDto;
+    const { parentId, parentSpouseId, birthOrder } = createChildDto;
 
     if (parentId === parentSpouseId) {
       throw new NotFoundException('Parent and spouse cannot be the same person');
@@ -519,44 +519,12 @@ export class MembersService implements IMembersService {
       }
     }
 
-    // Fetch all siblings (children of the same parents)
-    let siblings = await this.parentChildRelationshipsService.findByParentIds([parentId]);
-
-    if (parentSpouseId) {
-      const spouseChildren = await this.parentChildRelationshipsService.findByParentIds([parentSpouseId]);
-      siblings = siblings.concat(spouseChildren);
-    }
-
-    // Remove duplicates in case both parents were queried
-    const siblingIds = new Set(siblings.map(s => s.childId));
-    siblings = siblings.filter(s => siblingIds.has(s.childId));
-
-    // Retrieve full sibling details (including dateOfBirth)
-    const siblingMembers = await this.membersRepository.findByIds([...siblingIds]);
-
-    // Sort siblings by `dateOfBirth`
-    siblingMembers.sort((a, b) => {
-      const dateA = new Date(a.dateOfBirth).getTime();
-      const dateB = new Date(b.dateOfBirth).getTime();
-      return dateA - dateB;
-    });
-
-    // Find the correct birth order for the new child
-    let birthOrder = 1;
-    if (dateOfBirth) {
-      const childBirthTime = new Date(dateOfBirth).getTime();
-      birthOrder = siblingMembers.filter(sibling => new Date(sibling.dateOfBirth || '9999-12-31').getTime() < childBirthTime).length + 1;
-    } else {
-      // If dateOfBirth is missing, assign as the last born
-      birthOrder = siblingMembers.length + 1;
-    }
-
     // Create new child with uploaded files
     const createMemberDto = this.buildCreateChildMemberDto(parent, createChildDto);
     const child = await this.createMember(createMemberDto, files || []);
     if (!child) return null;
 
-    // Store parent-child relationships with generated birthOrder
+    // Store parent-child relationships with the provided birthOrder
     if (parentSpouse) {
       await this.createParentChildRelationships(parent, parentSpouse, child, birthOrder);
     } else {
@@ -569,6 +537,7 @@ export class MembersService implements IMembersService {
 
     return child;
   }
+
 
   private buildCreateChildMemberDto(parent: MemberDTO, createChildDto: CreateChildDto): CreateMemberDto {
     return Object.assign(new CreateMemberDto(), {
