@@ -8,10 +8,40 @@ import { AccountResponseDto } from '../dto/response/account.dto';
 import { AccountMapper } from '../mapper/account.mapper';
 import { CreateMemberDto } from '../../members/dto/request/create-member.dto';
 import { Promise } from 'mongoose';
+import { SearchAccountDto } from '../dto/request/search-account.dto';
+import { PaginationDTO } from 'src/utils/pagination.dto';
 
 @Injectable()
 export class AccountsService implements IAccountService {
-  constructor(private readonly accountsRepository: AccountsRepository) {}
+  constructor(private readonly accountsRepository: AccountsRepository) { }
+  async getAccountsWithPagination(searchDto: SearchAccountDto): Promise<PaginationDTO<AccountResponseDto>> {
+    const { page = 1, limit = 10, search, isAdmin } = searchDto;
+
+    // Khởi tạo bộ lọc tìm kiếm
+    const filters: any = { isAdmin: isAdmin };
+
+    if (isAdmin !== undefined) {
+      filters.isAdmin = isAdmin;
+    }
+
+    if (search) {
+      const regex = new RegExp(search, 'i');
+      filters.$or = [{ username: regex }, { email: regex }];
+    }
+
+    // Tìm tài khoản với phân trang
+    const { records, total } = await this.accountsRepository.findAndCount(filters, page, limit);
+
+    if (records.length === 0) return PaginationDTO.create([], 0, page, limit);
+
+    return PaginationDTO.create(
+      records.map((account) => AccountMapper.toResponseDto(account)),
+      total,
+      page,
+      limit
+    );
+  }
+
 
   /**
    * Creates a new account, ensuring a unique username if already exists.
