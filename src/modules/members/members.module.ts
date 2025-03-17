@@ -10,6 +10,7 @@ import { ParentChildRelationshipsModule } from '../parent-child-relationships/pa
 import { RelationshipTypesModule } from '../relationship-types/relationship-types.module';
 import { AccountsModule } from '../accounts/accounts.module';
 import { FaceDetectionService } from '../ai-face-detection/service/face-detection.service';
+import { MediaModule } from '../media/media.module';
 
 @Module({
   imports: [
@@ -18,7 +19,8 @@ import { FaceDetectionService } from '../ai-face-detection/service/face-detectio
     MarriagesModule,
     ParentChildRelationshipsModule,
     RelationshipTypesModule,
-    AccountsModule
+    AccountsModule,
+    MediaModule
   ],
   controllers: [MembersController],
   providers: [MembersService, MembersRepository,FaceDetectionService],

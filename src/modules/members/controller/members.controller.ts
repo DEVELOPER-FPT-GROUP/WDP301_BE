@@ -12,7 +12,7 @@ import {
   Query,
   Put,
   UploadedFile,
-  BadRequestException,
+  BadRequestException, UploadedFiles, ParseFilePipeBuilder, HttpStatus,
 } from '@nestjs/common';
 import { MembersService } from '../service/members.service';
 import { CreateMemberDto } from '../dto/request/create-member.dto';
@@ -25,7 +25,7 @@ import { LoggingInterceptor } from 'src/common/interceptors/logging.interceptor'
 import { JwtAuthGuard } from '../../auth/guard/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guard/roles.guard';
 import { Roles } from '../../auth/decorator/roles.decorator';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
 import { MulterFile } from 'src/common/types/multer-file.type';
 import { FaceDetectionService } from 'src/modules/ai-face-detection/service/face-detection.service';
 import { PaginationDTO } from '../../../utils/pagination.dto';
@@ -38,10 +38,18 @@ export class MembersController {
   constructor(private readonly membersService: MembersService,private readonly faceDetectionService: FaceDetectionService) {}
 
   @Post()
+  @UseInterceptors(FileFieldsInterceptor([{ name: 'files', maxCount: 10 }]))
   async create(
     @Body() createMemberDto: CreateMemberDto,
+    @UploadedFiles(
+      new ParseFilePipeBuilder()
+        .build({
+          errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+          fileIsRequired: false, // Files are optional
+        })
+    ) files: { files?: MulterFile[] }
   ): Promise<ResponseDTO<MemberDTO>> {
-    const result = await this.membersService.createMember(createMemberDto);
+    const result = await this.membersService.createMember(createMemberDto, files?.files || []);
     return ResponseDTO.success(result, 'Member created successfully');
   }
 
@@ -67,11 +75,19 @@ export class MembersController {
   }
 
   @Put('/update/:id')
+  @UseInterceptors(FileFieldsInterceptor([{ name: 'files', maxCount: 10 }]))
   async update(
     @Param('id') id: string,
     @Body() updateMemberDto: UpdateMemberDto,
+    @UploadedFiles(
+      new ParseFilePipeBuilder()
+        .build({
+          errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+          fileIsRequired: false, // Files are optional
+        })
+    ) files: { files?: MulterFile[] }
   ): Promise<ResponseDTO<MemberDTO>> {
-    const result = await this.membersService.updateMember(id, updateMemberDto);
+    const result = await this.membersService.updateMember(id, updateMemberDto, files?.files || []);
     return ResponseDTO.success(result, 'Member updated successfully');
   }
 
@@ -92,20 +108,50 @@ export class MembersController {
   }
 
   @Post('/add-spouse')
-  async createSpouse(@Body() createSpouseDto: CreateSpouseDto): Promise<ResponseDTO<MemberDTO | null>> {
-    const result = await this.membersService.createSpouse(createSpouseDto);
+  @UseInterceptors(FileFieldsInterceptor([{ name: 'files', maxCount: 10 }]))
+  async createSpouse(
+    @Body() createSpouseDto: CreateSpouseDto,
+    @UploadedFiles(
+      new ParseFilePipeBuilder()
+        .build({
+          errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+          fileIsRequired: false, // Files are optional
+        })
+    ) files: { files?: MulterFile[] }
+    ): Promise<ResponseDTO<MemberDTO | null>> {
+    const result = await this.membersService.createSpouse(createSpouseDto, files?.files || []);
     return ResponseDTO.success(result, 'Spouse created successfully');
   }
 
   @Post('/add-child')
-  async createChild(@Body() createChildDto: CreateChildDto): Promise<ResponseDTO<MemberDTO | null>> {
-    const result = await this.membersService.createChild(createChildDto);
+  @UseInterceptors(FileFieldsInterceptor([{ name: 'files', maxCount: 10 }]))
+  async createChild(
+    @Body() createChildDto: CreateChildDto,
+    @UploadedFiles(
+      new ParseFilePipeBuilder()
+        .build({
+          errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+          fileIsRequired: false, // Files are optional
+        })
+    ) files: { files?: MulterFile[] }
+  ): Promise<ResponseDTO<MemberDTO | null>> {
+    const result = await this.membersService.createChild(createChildDto, files?.files || []);
     return ResponseDTO.success(result, 'Child created successfully');
   }
 
   @Post('/create-family-leader')
-  async createFamilyLeader(@Body() createMemberDto: CreateMemberDto): Promise<ResponseDTO<MemberDTO>> {
-    const result = await this.membersService.createFamilyLeader(createMemberDto);
+  @UseInterceptors(FileFieldsInterceptor([{ name: 'files', maxCount: 10 }]))
+  async createFamilyLeader(
+    @Body() createMemberDto: CreateMemberDto,
+    @UploadedFiles(
+      new ParseFilePipeBuilder()
+        .build({
+          errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+          fileIsRequired: false, // Files are optional
+        })
+    ) files: { files?: MulterFile[] }
+    ): Promise<ResponseDTO<MemberDTO>> {
+    const result = await this.membersService.createFamilyLeader(createMemberDto, files?.files || []);
     return ResponseDTO.success(result, 'Family leader created successfully');
   }
 

@@ -39,9 +39,8 @@ export class CreateMemberDto {
   @IsBoolean()
   isAlive?: boolean;
 
-  @IsOptional()
-  @IsNumber()
-  generation?: number;
+  @IsNotEmpty()
+  generation?: string;
 
   @IsOptional()
   @IsString()

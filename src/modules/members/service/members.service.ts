@@ -30,7 +30,9 @@ import { DataUtils } from '../../../utils/data.utils';
 import { RELATIONSHIP_TYPES } from '../../../utils/message.utils';
 import { PaginationDTO } from '../../../utils/pagination.dto';
 import { SearchMemberDto } from '../dto/request/search-member.dto';
-import { AccountsRepository } from '../../accounts/repository/accounts.repository';
+import { MulterFile } from '../../../common/types/multer-file.type';
+import { MediaResponseDto } from '../../media/dto/response/media-response.dto';
+import { MediaService } from '../../media/serivce/media.service';
 
 @Injectable()
 export class MembersService implements IMembersService {
@@ -41,7 +43,7 @@ export class MembersService implements IMembersService {
     private readonly parentChildRelationshipsService: ParentChildRelationshipsService,
     private readonly relationshipTypeService: RelationshipTypesService,
     private readonly accountsService: AccountsService,
-    private readonly accountsRepository: AccountsRepository
+    private readonly mediaService: MediaService,
   ) {
   }
 
@@ -50,10 +52,29 @@ export class MembersService implements IMembersService {
    * @param createMemberDto - The data transfer object containing member details.
    * @returns The newly created member as a DTO.
    */
-  async createMember(createMemberDto: CreateMemberDto): Promise<MemberDTO> {
+  async createMember(createMemberDto: CreateMemberDto, files: MulterFile[]): Promise<MemberDTO> {
     console.log('createMemberDto:', createMemberDto);
     const createdMember = await this.membersRepository.create(createMemberDto);
-    return MemberDTO.map(createdMember);
+
+    console.log("files: ", files);
+    let mediaList: MediaResponseDto[] = [];
+    if (files && files.length > 0) {
+      mediaList = await this.mediaService.uploadMultipleFiles(files, String(createdMember._id), 'Member');
+    }
+
+    if(createdMember.isAlive) {
+      const createAccountDto = Object.assign(new CreateAccountDto(), {
+        memberId: String(createdMember._id),
+        // Generates a unique username based on the child's name
+        username: DataUtils.generateUniqueUsername(createdMember.firstName, createdMember.middleName || '', createdMember.lastName),
+        passwordHash: '123456', // Default password (should be securely managed)
+      });
+      await this.accountsService.createAccount(createAccountDto);
+    }
+
+    const memberDTO = MemberDTO.map(createdMember);
+    memberDTO.media = mediaList;
+    return memberDTO;
   }
 
   /**
@@ -84,12 +105,41 @@ export class MembersService implements IMembersService {
    * @param updateData - The data transfer object containing updated member details.
    * @returns The updated member DTO if found, otherwise throws a NotFoundException.
    */
-  async updateMember(id: string, updateData: UpdateMemberDto): Promise<MemberDTO> {
-    const updatedMember = await this.membersRepository.update(id, updateData);
-    if (!updatedMember) {
+  /**
+   * Updates a member's information and allows updating media files.
+   * @param id - The unique identifier of the member.
+   * @param updateData - The data transfer object containing updated member details.
+   * @param files - Optional list of media files to be uploaded.
+   * @returns The updated member DTO with updated media.
+   */
+  async updateMember(id: string, updateData: UpdateMemberDto, files?: MulterFile[]): Promise<MemberDTO> {
+    // Find the existing member
+    const existingMember = await this.membersRepository.findById(id);
+    if (!existingMember) {
       throw new NotFoundException('Member not found');
     }
-    return MemberDTO.map(updatedMember);
+
+    // Update the member details
+    const updatedMember = await this.membersRepository.update(id, updateData);
+    if (!updatedMember) {
+      throw new NotFoundException('Member not found after update');
+    }
+
+    let mediaList: MediaResponseDto[] = [];
+
+    // If new media files are provided, upload them
+    if (files && files.length > 0) {
+      mediaList = await this.mediaService.uploadMultipleFiles(files, String(updatedMember._id), 'Member');
+    } else {
+      // Retrieve existing media if no new files are uploaded
+      mediaList = await this.mediaService.getMediaByOwners([String(updatedMember._id)], 'Member');
+    }
+
+    // Convert updated member to DTO and attach media
+    const memberDTO = MemberDTO.map(updatedMember);
+    memberDTO.media = mediaList.map(media => media.url); // Return only media URLs
+
+    return memberDTO;
   }
 
   /**
@@ -151,6 +201,7 @@ export class MembersService implements IMembersService {
 
     const marriages = await this.marriagesService.getAllSpouses(memberIds);
     const parentChildRelations = await this.parentChildRelationshipsService.findByChildIds(memberIds);
+    const mediaMap = await this.getMediaMap(memberIds); // Lấy media của các thành viên
 
     // Create spouse map (handling multiple partners)
     const spouseMap = new Map<string, { id: string, name: string, gender: string, isSingle: boolean, isAlive: boolean, dateOfBirth: string, dateOfDeath: string | null, deleted?: boolean }[]>();
@@ -242,6 +293,7 @@ export class MembersService implements IMembersService {
         dateOfBirth: member.dateOfBirth ? new Date(member.dateOfBirth).toISOString() : '',
         dateOfDeath: member.dateOfDeath ? new Date(member.dateOfDeath).toISOString() : '',
         generation: member.generation,
+        media: mediaMap.get(String(member._id))?.map(media => media.url) || [], // Thêm media vào member
         relationships: [] as Array<{
           partner?: { id: string, name: string, gender: string, isSingle: boolean, isAlive: boolean, dateOfBirth: string, dateOfDeath: string | null },
           isMarried?: boolean,
@@ -335,17 +387,34 @@ export class MembersService implements IMembersService {
   }
 
   /**
+   * Retrieves media for a list of member IDs.
+   */
+  private async getMediaMap(memberIds: string[]): Promise<Map<string, MediaResponseDto[]>> {
+    const mediaList = await this.mediaService.getMediaByOwners(memberIds, 'Member');
+    const mediaMap = new Map<string, MediaResponseDto[]>();
+
+    mediaList.forEach(media => {
+      if (!mediaMap.has(media.ownerId)) {
+        mediaMap.set(media.ownerId, []);
+      }
+      mediaMap.get(media.ownerId)!.push(media);
+    });
+
+    return mediaMap;
+  }
+
+  /**
    * Creates a spouse for a given member and establishes a marriage relationship.
    * @param createSpouseDto - The DTO containing spouse details.
    * @returns The newly created spouse as a MemberDTO, or null if the member does not exist.
    */
-  async createSpouse(createSpouseDto: CreateSpouseDto): Promise<MemberDTO | null> {
+  async createSpouse(createSpouseDto: CreateSpouseDto, files?: MulterFile[]): Promise<MemberDTO | null> {
     const member = await this.getMemberById(createSpouseDto.memberId);
-    if (!member) return null;
+    if (!member) throw new NotFoundException('Member not found');
 
     // Create a MemberDto object for the spouse
     const createMemberDto = this.buildCreateSpouseMemberDto(member, createSpouseDto);
-    const spouse = await this.createMember(createMemberDto);
+    const spouse = await this.createMember(createMemberDto, files || []);
     if (!spouse) return null;
 
     // Create a marriage relationship
@@ -419,7 +488,7 @@ export class MembersService implements IMembersService {
    * @param createChildDto - The DTO containing child details.
    * @returns The newly created child as a MemberDTO, or null if the member or spouse does not exist.
    */
-  async createChild(createChildDto: CreateChildDto): Promise<MemberDTO | null> {
+  async createChild(createChildDto: CreateChildDto, files?: MulterFile[]): Promise<MemberDTO | null> {
     const { parentId, parentSpouseId, dateOfBirth } = createChildDto;
 
     if (parentId === parentSpouseId) {
@@ -482,9 +551,9 @@ export class MembersService implements IMembersService {
       birthOrder = siblingMembers.length + 1;
     }
 
-    // Create new child
+    // Create new child with uploaded files
     const createMemberDto = this.buildCreateChildMemberDto(parent, createChildDto);
-    const child = await this.createMember(createMemberDto);
+    const child = await this.createMember(createMemberDto, files || []);
     if (!child) return null;
 
     // Store parent-child relationships with generated birthOrder
@@ -758,10 +827,10 @@ export class MembersService implements IMembersService {
     return parentMap;
   }
 
-  async createFamilyLeader(createMemberDto: CreateMemberDto): Promise<MemberDTO> {
+  async createFamilyLeader(createMemberDto: CreateMemberDto, files?: MulterFile[]): Promise<MemberDTO> {
     console.log('Creating Family Leader:', createMemberDto);
 
-    const createdMember = await this.createMember(createMemberDto);
+    const createdMember = await this.createMember(createMemberDto, files || []);
     if (!createdMember) {
       throw new Error('Failed to create family leader');
     }
