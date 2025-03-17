@@ -11,11 +11,15 @@ import { ResponseDTO } from 'src/utils/response.dto';
 import { AccountResponseDto } from '../dto/response/account.dto';
 import { PaginationDTO } from 'src/utils/pagination.dto';
 import { SearchAccountDto } from '../dto/request/search-account.dto';
+import { FamiliesService } from '../../families/service/families.service';
 
 @UseInterceptors(LoggingInterceptor) // ✅ Apply logging interceptor
 @Controller('accounts')
 export class AccountsController {
-  constructor(private readonly accountsService: AccountsService) { }
+  constructor(
+    private readonly accountsService: AccountsService,
+    private readonly familyService: FamiliesService
+  ) { }
 
   @Get('')
   async getAccountsWithPagination(
@@ -43,6 +47,32 @@ export class AccountsController {
     logger.http(`Received GET request to fetch all accounts`);
     const result = await this.accountsService.getAllAccounts();
     return ResponseDTO.success(result, 'Accounts fetched successfully');
+  }
+
+
+  /**
+   * API to get total accounts created in a specific month and year.
+   * Example: GET /accounts/total-created?year=2025&month=3
+   */
+  @Get('total-created')
+  async getTotalCreatedAccounts(
+    @Query() searchQuery: { year: string; month: string },
+  ): Promise<ResponseDTO<any  >> {
+    const yearNum = parseInt(searchQuery.year, 10);
+    const monthNum = parseInt(searchQuery.month, 10);
+
+    if (isNaN(yearNum) || isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
+      throw new Error('Invalid year or month');
+    }
+
+    const totalAccountInsMonth = await this.accountsService.getTotalAccountsCreated(yearNum, monthNum);
+    const totalAccounts = (await this.accountsService.getAllAccounts()).length;
+    const totalFamilies = (await this.familyService.getAllFamilies()).length;
+    return ResponseDTO.success({
+      totalAccounts,
+      totalAccountInsMonth,
+      totalFamilies
+    }, "Retrieved data successfully");
   }
 
   /**
@@ -85,22 +115,4 @@ export class AccountsController {
     return ResponseDTO.success(result, `Account with ID ${id} deleted successfully`);
   }
 
-  /**
-   * API to get total accounts created in a specific month and year.
-   * Example: GET /accounts/total-created?year=2025&month=3
-   */
-  @Get('total-created')
-  async getTotalCreatedAccounts(
-    @Query() searchQuery: { year: string; month: string },
-  ): Promise<{ total: number }> {
-    const yearNum = parseInt(searchQuery.year, 10);
-    const monthNum = parseInt(searchQuery.month, 10);
-
-    if (isNaN(yearNum) || isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
-      throw new Error('Invalid year or month');
-    }
-
-    const total = await this.accountsService.getTotalAccountsCreated(yearNum, monthNum);
-    return { total };
-  }
 }
