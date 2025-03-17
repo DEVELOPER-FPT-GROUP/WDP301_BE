@@ -30,7 +30,9 @@ import { DataUtils } from '../../../utils/data.utils';
 import { RELATIONSHIP_TYPES } from '../../../utils/message.utils';
 import { PaginationDTO } from '../../../utils/pagination.dto';
 import { SearchMemberDto } from '../dto/request/search-member.dto';
-import { AccountsRepository } from '../../accounts/repository/accounts.repository';
+import { MulterFile } from '../../../common/types/multer-file.type';
+import { MediaResponseDto } from '../../media/dto/response/media-response.dto';
+import { MediaService } from '../../media/serivce/media.service';
 
 @Injectable()
 export class MembersService implements IMembersService {
@@ -41,7 +43,7 @@ export class MembersService implements IMembersService {
     private readonly parentChildRelationshipsService: ParentChildRelationshipsService,
     private readonly relationshipTypeService: RelationshipTypesService,
     private readonly accountsService: AccountsService,
-    private readonly accountsRepository: AccountsRepository
+    private readonly mediaService: MediaService,
   ) {
   }
 
@@ -50,10 +52,29 @@ export class MembersService implements IMembersService {
    * @param createMemberDto - The data transfer object containing member details.
    * @returns The newly created member as a DTO.
    */
-  async createMember(createMemberDto: CreateMemberDto): Promise<MemberDTO> {
+  async createMember(createMemberDto: CreateMemberDto, files: MulterFile[]): Promise<MemberDTO> {
     console.log('createMemberDto:', createMemberDto);
     const createdMember = await this.membersRepository.create(createMemberDto);
-    return MemberDTO.map(createdMember);
+
+    console.log("files: ", files);
+    let mediaList: MediaResponseDto[] = [];
+    if (files && files.length > 0) {
+      mediaList = await this.mediaService.uploadMultipleFiles(files, String(createdMember._id), 'Member');
+    }
+
+    if(createdMember.isAlive) {
+      const createAccountDto = Object.assign(new CreateAccountDto(), {
+        memberId: String(createdMember._id),
+        // Generates a unique username based on the child's name
+        username: DataUtils.generateUniqueUsername(createdMember.firstName, createdMember.middleName || '', createdMember.lastName),
+        passwordHash: '123456', // Default password (should be securely managed)
+      });
+      await this.accountsService.createAccount(createAccountDto);
+    }
+
+    const memberDTO = MemberDTO.map(createdMember);
+    memberDTO.media = mediaList;
+    return memberDTO;
   }
 
   /**
@@ -84,12 +105,41 @@ export class MembersService implements IMembersService {
    * @param updateData - The data transfer object containing updated member details.
    * @returns The updated member DTO if found, otherwise throws a NotFoundException.
    */
-  async updateMember(id: string, updateData: UpdateMemberDto): Promise<MemberDTO> {
-    const updatedMember = await this.membersRepository.update(id, updateData);
-    if (!updatedMember) {
+  /**
+   * Updates a member's information and allows updating media files.
+   * @param id - The unique identifier of the member.
+   * @param updateData - The data transfer object containing updated member details.
+   * @param files - Optional list of media files to be uploaded.
+   * @returns The updated member DTO with updated media.
+   */
+  async updateMember(id: string, updateData: UpdateMemberDto, files?: MulterFile[]): Promise<MemberDTO> {
+    // Find the existing member
+    const existingMember = await this.membersRepository.findById(id);
+    if (!existingMember) {
       throw new NotFoundException('Member not found');
     }
-    return MemberDTO.map(updatedMember);
+
+    // Update the member details
+    const updatedMember = await this.membersRepository.update(id, updateData);
+    if (!updatedMember) {
+      throw new NotFoundException('Member not found after update');
+    }
+
+    let mediaList: MediaResponseDto[] = [];
+
+    // If new media files are provided, upload them
+    if (files && files.length > 0) {
+      mediaList = await this.mediaService.uploadMultipleFiles(files, String(updatedMember._id), 'Member');
+    } else {
+      // Retrieve existing media if no new files are uploaded
+      mediaList = await this.mediaService.getMediaByOwners([String(updatedMember._id)], 'Member');
+    }
+
+    // Convert updated member to DTO and attach media
+    const memberDTO = MemberDTO.map(updatedMember);
+    memberDTO.media = mediaList.map(media => media.url); // Return only media URLs
+
+    return memberDTO;
   }
 
   /**
@@ -110,33 +160,247 @@ export class MembersService implements IMembersService {
    * @param familyId - The unique identifier of the family.
    * @returns An array of MemberDTOs with spouse, parent, and children information.
    */
-  async findMembersInFamily(familyId: string): Promise<MemberDTO[]> {
-    // Fetch the family by ID
+  // async findMembersInFamily(familyId: string): Promise<MemberDTO[]> {
+  //   // Fetch the family by ID
+  //   const family = await this.familiesService.getFamilyById(familyId);
+  //   if (!family) return [];
+  //
+  //   // Fetch all members in the given family
+  //   const members = await this.membersRepository.findMembersInFamily(familyId);
+  //   if (!members.length) return [];
+  //
+  //   // Convert members to DTOs and extract member IDs
+  //   const memberDTOs = members.map(member => MemberDTO.map(member));
+  //   const memberIds = memberDTOs.map(member => member.memberId);
+  //
+  //   const marriages = await this.marriagesService.getAllSpouses(memberIds);
+  //   const childRelations = await this.parentChildRelationshipsService.findByChildIds(memberIds);
+  //
+  //   // Create lookup maps
+  //   const spouseMap = await this.createSpouseMap(marriages);  // This will return an array of SpouseDTOs
+  //   const parentMap = await this.createParentMap(childRelations);
+  //
+  //   // Assign spouse, children, and parent data
+  //   return memberDTOs.map(memberDTO => {
+  //     // Assign an array of spouses to the memberDTO
+  //     memberDTO.spouses = spouseMap.get(memberDTO.memberId);
+  //     memberDTO.parent = parentMap.get(memberDTO.memberId);
+  //     return memberDTO;
+  //   });
+  // }
+
+  async findMembersInFamily(familyId: string): Promise<any> {
     const family = await this.familiesService.getFamilyById(familyId);
-    if (!family) return [];
+    if (!family) return null;
 
-    // Fetch all members in the given family
     const members = await this.membersRepository.findMembersInFamily(familyId);
-    if (!members.length) return [];
+    if (!members.length) return null;
 
-    // Convert members to DTOs and extract member IDs
-    const memberDTOs = members.map(member => MemberDTO.map(member));
-    const memberIds = memberDTOs.map(member => member.memberId);
+    const memberMap = new Map<string, any>();
+    const memberIds = members.map(m => String(m._id));
 
     const marriages = await this.marriagesService.getAllSpouses(memberIds);
-    const childRelations = await this.parentChildRelationshipsService.findByChildIds(memberIds);
+    const parentChildRelations = await this.parentChildRelationshipsService.findByChildIds(memberIds);
+    const mediaMap = await this.getMediaMap(memberIds); // Lấy media của các thành viên
 
-    // Create lookup maps
-    const spouseMap = await this.createSpouseMap(marriages);  // This will return an array of SpouseDTOs
-    const parentMap = await this.createParentMap(childRelations);
+    // Create spouse map (handling multiple partners)
+    const spouseMap = new Map<string, { id: string, name: string, gender: string, isSingle: boolean, isAlive: boolean, dateOfBirth: string, dateOfDeath: string | null, deleted?: boolean }[]>();
+    marriages.forEach(({ husbandId, wifeId }) => {
+      const husband = members.find(m => String(m._id) === String(husbandId));
+      const wife = members.find(m => String(m._id) === String(wifeId));
 
-    // Assign spouse, children, and parent data
-    return memberDTOs.map(memberDTO => {
-      // Assign an array of spouses to the memberDTO
-      memberDTO.spouses = spouseMap.get(memberDTO.memberId);
-      memberDTO.parent = parentMap.get(memberDTO.memberId);
-      return memberDTO;
+      if (husband && wife) {
+        if (!spouseMap.has(String(husbandId))) spouseMap.set(String(husbandId), []);
+        if (!spouseMap.has(String(wifeId))) spouseMap.set(String(wifeId), []);
+
+        spouseMap.get(String(husbandId))!.push({
+          id: String(wifeId),
+          name: `${wife.firstName} ${wife.middleName || ''} ${wife.lastName}`.trim(),
+          gender: wife.gender,
+          isSingle: wife.isSingle,
+          isAlive: wife.isAlive,
+          dateOfBirth: wife.dateOfBirth ? new Date(wife.dateOfBirth).toISOString() : '',
+          dateOfDeath: wife.dateOfDeath ? new Date(wife.dateOfDeath).toISOString() : '',
+          deleted: wife.isDeleted
+        });
+
+        spouseMap.get(String(wifeId))!.push({
+          id: String(husbandId),
+          name: `${husband.firstName} ${husband.middleName || ''} ${husband.lastName}`.trim(),
+          gender: husband.gender,
+          isSingle: husband.isSingle,
+          isAlive: husband.isAlive,
+          dateOfBirth: husband.dateOfBirth ? new Date(husband.dateOfBirth).toISOString() : '',
+          dateOfDeath: husband.dateOfDeath ? new Date(husband.dateOfDeath).toISOString() : '',
+          deleted: husband.isDeleted
+        });
+      }
     });
+
+    // Create children map linked to both parents
+    const childParentMap = new Map<string, string[]>(); // Tracks child-to-parents mapping
+    const childrenMap = new Map<string, any[]>();
+
+    // Store birthOrder information from parentChildRelations
+    const birthOrderMap = new Map<string, number>();
+
+    parentChildRelations.forEach(({ parentId, childId, birthOrder }) => {
+      const child = members.find(m => String(m._id) === String(childId));
+      if (child) {
+        const parentKey = String(parentId);
+        if (!childrenMap.has(parentKey)) {
+          childrenMap.set(parentKey, []);
+        }
+
+        childrenMap.get(parentKey)!.push({
+          id: String(childId),
+          name: `${child.firstName} ${child.middleName || ''} ${child.lastName}`.trim(),
+          generation: child.generation,
+          gender: child.gender,
+          isSingle: child.isSingle,
+          isAlive: child.isAlive,
+          dateOfBirth: child.dateOfBirth ? new Date(child.dateOfBirth).toISOString() : '',
+          dateOfDeath: child.dateOfDeath ? new Date(child.dateOfDeath).toISOString() : '',
+          birthOrder: birthOrder || 0 // Default birthOrder to 0 if missing
+        });
+
+        // Store birth order
+        birthOrderMap.set(String(childId), birthOrder || 0);
+
+        // Track child-parent relationships
+        if (!childParentMap.has(String(childId))) {
+          childParentMap.set(String(childId), []);
+        }
+        childParentMap.get(String(childId))!.push(parentKey);
+      }
+    });
+
+    // **Sort children by birthOrder**
+    childrenMap.forEach((children, parentId) => {
+      children.sort((a, b) => (a.birthOrder - b.birthOrder));
+    });
+
+    // Create member data structure
+    members.forEach(member => {
+      if (member.isDeleted) return;
+
+      const memberData = {
+        id: String(member._id),
+        name: `${member.firstName} ${member.middleName || ''} ${member.lastName}`.trim(),
+        gender: member.gender,
+        isSingle: member.isSingle,
+        isAlive: member.isAlive,
+        dateOfBirth: member.dateOfBirth ? new Date(member.dateOfBirth).toISOString() : '',
+        dateOfDeath: member.dateOfDeath ? new Date(member.dateOfDeath).toISOString() : '',
+        generation: member.generation,
+        media: mediaMap.get(String(member._id))?.map(media => media.url) || [], // Thêm media vào member
+        relationships: [] as Array<{
+          partner?: { id: string, name: string, gender: string, isSingle: boolean, isAlive: boolean, dateOfBirth: string, dateOfDeath: string | null },
+          isMarried?: boolean,
+          children?: { id: string, name: string, generation: number, gender: string, isSingle: boolean, isAlive: boolean, dateOfBirth: string, dateOfDeath: string | null, birthOrder: number }[]
+        }>
+      };
+
+      let hasVisiblePartner = false;
+      if (spouseMap.has(memberData.id)) {
+        spouseMap.get(memberData.id)!.forEach(spouse => {
+          let sharedChildren = (childrenMap.get(memberData.id) || []).filter(child =>
+            childParentMap.has(child.id) &&
+            childParentMap.get(child.id)!.includes(spouse.id)
+          );
+
+          // Attach birthOrder from birthOrderMap
+          sharedChildren = sharedChildren.map(child => ({
+            ...child,
+            birthOrder: birthOrderMap.get(child.id) || 0
+          }));
+
+          // Sort children by birthOrder before adding to relationships
+          sharedChildren.sort((a, b) => a.birthOrder - b.birthOrder);
+
+          if (!spouse.deleted) {
+            hasVisiblePartner = true;
+            memberData.relationships.push({
+              partner: spouse,
+              isMarried: true,
+              children: sharedChildren.length ? sharedChildren : undefined
+            });
+          } else if (sharedChildren.length > 0) {
+            // Partner is deleted, but children should remain in a separate object
+            memberData.relationships.push({
+              children: sharedChildren
+            });
+          }
+        });
+      }
+
+      // Remove "isMarried" if all partners are deleted
+      if (!hasVisiblePartner) {
+        memberData.relationships.forEach(rel => {
+          delete rel.isMarried;
+        });
+      }
+
+      memberMap.set(memberData.id, memberData);
+    });
+
+    const rootMember = members.find(m => m.generation === 0 && !m.isDeleted);
+    if (!rootMember) return null;
+
+    const visited = new Set<string>();
+
+    function constructHierarchy(memberId: string): any {
+      if (visited.has(memberId)) return null;
+      visited.add(memberId);
+
+      const memberData = memberMap.get(memberId);
+      if (!memberData) return null;
+
+      memberData.relationships = memberData.relationships.map(rel => {
+        if (rel.partner) {
+          rel.partner = {
+            id: rel.partner.id,
+            name: rel.partner.name,
+            gender: rel.partner.gender,
+            isSingle: rel.partner.isSingle,
+            isAlive: rel.partner.isAlive,
+            dateOfBirth: rel.partner.dateOfBirth,
+            dateOfDeath: rel.partner.dateOfDeath
+          };
+        }
+        if (rel.children) {
+          rel.children = rel.children
+            .map(child => ({
+              ...constructHierarchy(child.id),
+              birthOrder: birthOrderMap.get(child.id) || 0
+            }))
+            .sort((a, b) => a.birthOrder - b.birthOrder)
+            .filter(Boolean);
+        }
+        return rel;
+      }).filter(Boolean);
+
+      return memberData;
+    }
+
+    return constructHierarchy(String(rootMember._id));
+  }
+
+  /**
+   * Retrieves media for a list of member IDs.
+   */
+  private async getMediaMap(memberIds: string[]): Promise<Map<string, MediaResponseDto[]>> {
+    const mediaList = await this.mediaService.getMediaByOwners(memberIds, 'Member');
+    const mediaMap = new Map<string, MediaResponseDto[]>();
+
+    mediaList.forEach(media => {
+      if (!mediaMap.has(media.ownerId)) {
+        mediaMap.set(media.ownerId, []);
+      }
+      mediaMap.get(media.ownerId)!.push(media);
+    });
+
+    return mediaMap;
   }
 
   /**
@@ -144,13 +408,13 @@ export class MembersService implements IMembersService {
    * @param createSpouseDto - The DTO containing spouse details.
    * @returns The newly created spouse as a MemberDTO, or null if the member does not exist.
    */
-  async createSpouse(createSpouseDto: CreateSpouseDto): Promise<MemberDTO | null> {
+  async createSpouse(createSpouseDto: CreateSpouseDto, files?: MulterFile[]): Promise<MemberDTO | null> {
     const member = await this.getMemberById(createSpouseDto.memberId);
-    if (!member) return null;
+    if (!member) throw new NotFoundException('Member not found');
 
     // Create a MemberDto object for the spouse
     const createMemberDto = this.buildCreateSpouseMemberDto(member, createSpouseDto);
-    const spouse = await this.createMember(createMemberDto);
+    const spouse = await this.createMember(createMemberDto, files || []);
     if (!spouse) return null;
 
     // Create a marriage relationship
@@ -224,8 +488,8 @@ export class MembersService implements IMembersService {
    * @param createChildDto - The DTO containing child details.
    * @returns The newly created child as a MemberDTO, or null if the member or spouse does not exist.
    */
-  async createChild(createChildDto: CreateChildDto): Promise<MemberDTO | null> {
-    const { parentId, parentSpouseId } = createChildDto;
+  async createChild(createChildDto: CreateChildDto, files?: MulterFile[]): Promise<MemberDTO | null> {
+    const { parentId, parentSpouseId, dateOfBirth } = createChildDto;
 
     if (parentId === parentSpouseId) {
       throw new NotFoundException('Parent and spouse cannot be the same person');
@@ -255,14 +519,48 @@ export class MembersService implements IMembersService {
       }
     }
 
+    // Fetch all siblings (children of the same parents)
+    let siblings = await this.parentChildRelationshipsService.findByParentIds([parentId]);
+
+    if (parentSpouseId) {
+      const spouseChildren = await this.parentChildRelationshipsService.findByParentIds([parentSpouseId]);
+      siblings = siblings.concat(spouseChildren);
+    }
+
+    // Remove duplicates in case both parents were queried
+    const siblingIds = new Set(siblings.map(s => s.childId));
+    siblings = siblings.filter(s => siblingIds.has(s.childId));
+
+    // Retrieve full sibling details (including dateOfBirth)
+    const siblingMembers = await this.membersRepository.findByIds([...siblingIds]);
+
+    // Sort siblings by `dateOfBirth`
+    siblingMembers.sort((a, b) => {
+      const dateA = new Date(a.dateOfBirth).getTime();
+      const dateB = new Date(b.dateOfBirth).getTime();
+      return dateA - dateB;
+    });
+
+    // Find the correct birth order for the new child
+    let birthOrder = 1;
+    if (dateOfBirth) {
+      const childBirthTime = new Date(dateOfBirth).getTime();
+      birthOrder = siblingMembers.filter(sibling => new Date(sibling.dateOfBirth || '9999-12-31').getTime() < childBirthTime).length + 1;
+    } else {
+      // If dateOfBirth is missing, assign as the last born
+      birthOrder = siblingMembers.length + 1;
+    }
+
+    // Create new child with uploaded files
     const createMemberDto = this.buildCreateChildMemberDto(parent, createChildDto);
-    const child = await this.createMember(createMemberDto);
+    const child = await this.createMember(createMemberDto, files || []);
     if (!child) return null;
 
+    // Store parent-child relationships with generated birthOrder
     if (parentSpouse) {
-      await this.createParentChildRelationships(parent, parentSpouse, child, createChildDto.birthOrder);
+      await this.createParentChildRelationships(parent, parentSpouse, child, birthOrder);
     } else {
-      await this.createSingleParentChildRelationship(parent, child, createChildDto.birthOrder);
+      await this.createSingleParentChildRelationship(parent, child, birthOrder);
     }
 
     if (child.isAlive) {
@@ -271,7 +569,6 @@ export class MembersService implements IMembersService {
 
     return child;
   }
-
 
   private buildCreateChildMemberDto(parent: MemberDTO, createChildDto: CreateChildDto): CreateMemberDto {
     return Object.assign(new CreateMemberDto(), {
@@ -530,10 +827,10 @@ export class MembersService implements IMembersService {
     return parentMap;
   }
 
-  async createFamilyLeader(createMemberDto: CreateMemberDto): Promise<MemberDTO> {
+  async createFamilyLeader(createMemberDto: CreateMemberDto, files?: MulterFile[]): Promise<MemberDTO> {
     console.log('Creating Family Leader:', createMemberDto);
 
-    const createdMember = await this.createMember(createMemberDto);
+    const createdMember = await this.createMember(createMemberDto, files || []);
     if (!createdMember) {
       throw new Error('Failed to create family leader');
     }

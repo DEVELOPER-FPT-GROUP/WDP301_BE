@@ -9,6 +9,10 @@ export class FamilyDTO {
 
   createdAt: Date;
 
+  username: string;
+
+  quantity: number;
+
   static map(family: Family) {
     const dto = new FamilyDTO();
     dto.familyId = String(family._id);

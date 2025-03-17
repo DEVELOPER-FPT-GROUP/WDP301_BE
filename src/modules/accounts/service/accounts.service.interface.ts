@@ -20,5 +20,7 @@ export interface IAccountService {
 
   createFamilyLeaderAccount(createAccountDto: CreateAccountDto): Promise<AccountResponseDto>;
 
+  getTotalAccountsCreated(year: number, month: number): Promise<number>
+  
   getAccountsWithPagination(searchDto: SearchAccountDto): Promise<PaginationDTO<AccountResponseDto>>;
 }

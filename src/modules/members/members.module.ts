@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { MembersService } from './service/members.service';
 import { MembersController } from './controller/members.controller';
@@ -10,15 +10,17 @@ import { ParentChildRelationshipsModule } from '../parent-child-relationships/pa
 import { RelationshipTypesModule } from '../relationship-types/relationship-types.module';
 import { AccountsModule } from '../accounts/accounts.module';
 import { FaceDetectionService } from '../ai-face-detection/service/face-detection.service';
+import { MediaModule } from '../media/media.module';
 
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: Member.name, schema: MemberSchema }]),
-    FamiliesModule,
+    forwardRef(() => FamiliesModule),
     MarriagesModule,
     ParentChildRelationshipsModule,
     RelationshipTypesModule,
-    AccountsModule
+    AccountsModule,
+    MediaModule
   ],
   controllers: [MembersController],
   providers: [MembersService, MembersRepository,FaceDetectionService],
