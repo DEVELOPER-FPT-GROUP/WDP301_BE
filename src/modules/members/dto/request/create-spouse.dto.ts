@@ -31,7 +31,6 @@ export class CreateSpouseDto {
   placeOfDeath?: string;
 
   @IsOptional()
-  @IsBoolean()
   isAlive?: boolean;
 
   @IsOptional()

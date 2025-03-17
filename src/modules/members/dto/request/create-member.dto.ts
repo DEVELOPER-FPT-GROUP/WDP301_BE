@@ -36,7 +36,6 @@ export class CreateMemberDto {
   worship?: string;
 
   @IsOptional()
-  @IsBoolean()
   isAlive?: boolean;
 
   @IsNotEmpty()
@@ -62,6 +61,5 @@ export class CreateMemberDto {
   password?: string;
 
   @IsOptional()
-  @IsBoolean()
   isDeleted?: boolean;
 }

@@ -70,6 +70,21 @@ export class MediaController {
   }
 
   /**
+   * 🗑 Delete multiple media records
+   * @param body.mediaIds - Array of media IDs to delete
+   * @returns Success message after deletion
+   */
+  @Delete('delete-multiple')
+  async deleteMultipleMedia(@Body() body: { mediaIds: string[] }): Promise<ResponseDTO<any>> {
+    if (!body.mediaIds || body.mediaIds.length === 0) {
+      throw new BadRequestException('Media IDs are required for deletion');
+    }
+
+    await this.mediaService.deleteMultipleMedia(body.mediaIds);
+    return ResponseDTO.success(null, 'Media deleted successfully');
+  }
+
+  /**
    * 🗑 Delete Media (Removes from Firebase & DB)
    */
   @Delete(':id')
