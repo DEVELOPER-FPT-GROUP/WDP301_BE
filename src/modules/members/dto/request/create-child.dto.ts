@@ -37,7 +37,6 @@ export class CreateChildDto {
   placeOfDeath?: string;
 
   @IsOptional()
-  @IsBoolean()
   isAlive?: boolean;
 
   @IsOptional()
