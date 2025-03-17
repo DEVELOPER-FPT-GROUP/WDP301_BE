@@ -26,6 +26,7 @@ export class MemberDTO {
   spouses?: SpouseDTO[];
   childDTOS?: ChildDTO[];
   isDeleted: boolean;
+  media?: any[];
 
   static map(member: Member): MemberDTO {
     const dto = new MemberDTO();

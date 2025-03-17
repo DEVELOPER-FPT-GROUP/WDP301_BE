@@ -38,7 +38,7 @@ export class AccountsController {
   /**
    * Get all accounts
    */
-  @Get('/all')
+  @Get()
   async getAllAccounts(): Promise<ResponseDTO<AccountResponseDto[]>> {
     logger.http(`Received GET request to fetch all accounts`);
     const result = await this.accountsService.getAllAccounts();
@@ -68,7 +68,7 @@ export class AccountsController {
   /**
    * Update an account by ID
    */
-  @Put(':id')
+  @Patch(':id')
   async updateAccount(@Param('id') id: string, @Body() updateAccountDto: UpdateAccountDto): Promise<ResponseDTO<AccountResponseDto>> {
     logger.http(`Received PATCH request to update account with ID: ${id}`);
     const result = await this.accountsService.updateAccount(id, updateAccountDto);
@@ -83,5 +83,24 @@ export class AccountsController {
     logger.http(`Received DELETE request to remove account with ID: ${id}`);
     const result = await this.accountsService.deleteAccount(id);
     return ResponseDTO.success(result, `Account with ID ${id} deleted successfully`);
+  }
+
+  /**
+   * API to get total accounts created in a specific month and year.
+   * Example: GET /accounts/total-created?year=2025&month=3
+   */
+  @Get('total-created')
+  async getTotalCreatedAccounts(
+    @Query() searchQuery: { year: string; month: string },
+  ): Promise<{ total: number }> {
+    const yearNum = parseInt(searchQuery.year, 10);
+    const monthNum = parseInt(searchQuery.month, 10);
+
+    if (isNaN(yearNum) || isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
+      throw new Error('Invalid year or month');
+    }
+
+    const total = await this.accountsService.getTotalAccountsCreated(yearNum, monthNum);
+    return { total };
   }
 }
