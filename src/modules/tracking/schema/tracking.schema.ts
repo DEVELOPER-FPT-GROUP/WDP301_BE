@@ -1,4 +1,4 @@
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose'; 
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Schema as MongooseSchema } from 'mongoose';
 
 export type TrackingDocument = HydratedDocument<Tracking>;
@@ -27,7 +27,7 @@ export class Tracking {
   @Prop({ required: true, default: 0 })
   totalRevenue: number;
 
-  @Prop({ type: [RevenueEntry] }) 
+  @Prop({ type: [RevenueEntry] })
   revenueHistory: RevenueEntry[];
 
   @Prop({ default: Date.now })
@@ -35,6 +35,14 @@ export class Tracking {
 
   @Prop({ default: Date.now })
   updatedAt: Date;
+
+  // Use a Map to track views for each month (YYYY-MM format)
+  @Prop({ type: Map, of: Number, default: {} })
+  monthlyViews: Map<string, number>; // Track views per month for each year (e.g., "2025-01" for Jan 2025)
+
+  // Use a Map to track revenue for each month (YYYY-MM format)
+  @Prop({ type: Map, of: Number, default: {} })
+  monthlyRevenue: Map<string, number>; // Track revenue per month for each year (e.g., "2025-01" for Jan 2025)
 }
 
 export const TrackingSchema = SchemaFactory.createForClass(Tracking);

@@ -7,9 +7,7 @@ import { UpdateOrderDto } from '../dto/request/update-order.dto';
 
 @Injectable()
 export class OrdersRepository {
-  constructor(
-    @InjectModel(Order.name) private orderModel: Model<OrderDocument>,
-  ) {}
+  constructor(@InjectModel(Order.name) private orderModel: Model<OrderDocument>) {}
 
   async findById(id: string): Promise<Order | null> {
     return this.orderModel.findById(id).exec();
@@ -32,4 +30,23 @@ export class OrdersRepository {
   async findAll(): Promise<Order[]> {
     return this.orderModel.find().sort({ createdAt: -1 }).exec();
   }
+
+  // Method for pagination and search functionality
+  async findPaginated(
+    filters: any, 
+    page: number, 
+    limit: number, 
+    sortOptions: any = {}
+  ): Promise<{ records: Order[]; total: number }> {
+    const skip = (page - 1) * limit;
+
+    const [orders, total] = await Promise.all([
+      this.orderModel.find(filters).sort(sortOptions).skip(skip).limit(limit).select('-__v').lean().exec(),
+      this.orderModel.countDocuments(filters),
+    ]);
+
+    return { records: orders, total };
+  }
+  
+  
 }

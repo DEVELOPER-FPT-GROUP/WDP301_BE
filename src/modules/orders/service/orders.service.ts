@@ -4,19 +4,28 @@ import { CreateOrderDto } from '../dto/request/create-order.dto';
 import { UpdateOrderDto } from '../dto/request/update-order.dto';
 import { Order, SubscriptionStatus } from '../schema/order.schema';
 import { TrackingsService } from 'src/modules/tracking/service/tracking.service';
+import { PaginationDTO } from 'src/utils/pagination.dto';
 
 @Injectable()
 export class OrdersService {
   constructor(
     private readonly ordersRepository: OrdersRepository,
-
-    @Inject(forwardRef(() => TrackingsService)) // Avoid circular dependency
+    @Inject(forwardRef(() => TrackingsService))
     private readonly trackingsService: TrackingsService,
   ) {}
-
-  /**
-   * Lấy thông tin đơn hàng theo ID
-   */
+  async create(data: CreateOrderDto): Promise<Order> {
+    // Create the new order using the repository
+    const newOrder = await this.ordersRepository.create(data);
+  
+    // If the order status is ACTIVE, update the revenue
+    if (newOrder.status === SubscriptionStatus.ACTIVE) {
+      await this.trackingsService.updateRevenueForOrder(newOrder._id.toString(), newOrder.status, newOrder.price);
+    }
+  
+    // Return the newly created order
+    return newOrder;
+  }
+  
   async findById(id: string): Promise<Order> {
     const order = await this.ordersRepository.findById(id);
     if (!order) {
@@ -25,32 +34,34 @@ export class OrdersService {
     return order;
   }
 
-  /**
-   * Lấy danh sách tất cả đơn hàng
-   */
   async findAll(): Promise<Order[]> {
     return this.ordersRepository.findAll();
   }
 
   /**
-   * Tạo mới một đơn hàng
-   * - Nếu trạng thái ban đầu là `ACTIVE`, doanh thu được cập nhật ngay.
+   * Lấy danh sách đơn hàng có phân trang và tìm kiếm
    */
-  async create(data: CreateOrderDto): Promise<Order> {
-    const order = await this.ordersRepository.create(data);
+  async findAllPaginated(options: { page: number; limit: number; search: string; sortByDate: boolean }): Promise<PaginationDTO<Order>> {
+    const { page = 1, limit = 10, search = '', sortByDate = false } = options;
 
-    // Nếu đơn hàng đã được kích hoạt (ACTIVE) ngay khi tạo -> Cập nhật doanh thu
-    if (order.status === SubscriptionStatus.ACTIVE) {
-      await this.trackingsService.updateRevenueForOrder(order._id.toString(), order.status, order.price);
+    const filters: any = {};
+
+    if (search) {
+      const regex = new RegExp(search, 'i');
+      filters.$or = [
+        { fullName: regex },
+        { transactionId: regex },
+      ];
     }
 
-    return order;
+    const sortOptions = sortByDate ? { createdAt: 1 } : { createdAt: -1 };
+
+    // Get paginated data
+    const { records, total } = await this.ordersRepository.findPaginated(filters, page, limit, sortOptions);
+
+    return PaginationDTO.create(records, total, page, limit);
   }
 
-  /**
-   * Cập nhật thông tin đơn hàng (không thay đổi trạng thái subscription)
-   * - Nếu giá thay đổi, doanh thu sẽ được cập nhật.
-   */
   async update(id: string, updateData: UpdateOrderDto): Promise<Order> {
     const order = await this.ordersRepository.findById(id);
     if (!order) {
@@ -62,12 +73,25 @@ export class OrdersService {
       throw new NotFoundException(`Failed to update order with ID ${id}`);
     }
 
-    // Nếu giá thay đổi, cần cập nhật lại doanh thu
     if (updateData.price !== undefined && order.status === SubscriptionStatus.ACTIVE) {
-      await this.trackingsService.updateTotalRevenue();
+      await this.trackingsService.updateRevenueForOrder(id, order.status, updateData.price);
     }
 
     return updatedOrder;
+  }
+
+  async delete(id: string): Promise<boolean> {
+    const order = await this.ordersRepository.findById(id);
+    if (!order) {
+      throw new NotFoundException(`Order with ID ${id} not found`);
+    }
+
+    const isDeleted = await this.ordersRepository.delete(id);
+    if (!isDeleted) {
+      throw new NotFoundException(`Failed to delete order with ID ${id}`);
+    }
+
+    return isDeleted;
   }
 
   /**
@@ -92,23 +116,5 @@ export class OrdersService {
     }
 
     return updatedOrder;
-  }
-
-  /**
-   * Xóa đơn hàng
-   * - Doanh thu không thay đổi vì subscription đã được xử lý trước đó.
-   */
-  async delete(id: string): Promise<boolean> {
-    const order = await this.ordersRepository.findById(id);
-    if (!order) {
-      throw new NotFoundException(`Order with ID ${id} not found`);
-    }
-
-    const isDeleted = await this.ordersRepository.delete(id);
-    if (!isDeleted) {
-      throw new NotFoundException(`Failed to delete order with ID ${id}`);
-    }
-
-    return isDeleted;
   }
 }

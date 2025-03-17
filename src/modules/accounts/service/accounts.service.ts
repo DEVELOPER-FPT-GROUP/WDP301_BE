@@ -46,7 +46,7 @@ export class AccountsService implements IAccountService {
     const { page = 1, limit = 10, search, isAdmin } = searchDto;
 
     // Khởi tạo bộ lọc tìm kiếm
-    const filters: any = { isAdmin: isAdmin };
+    const filters: any = {  };
 
     if (isAdmin !== undefined) {
       filters.isAdmin = isAdmin;

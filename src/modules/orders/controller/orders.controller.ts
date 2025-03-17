@@ -1,10 +1,12 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, Put } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Put, Query } from '@nestjs/common';
 import { OrdersService } from '../service/orders.service';
 import { CreateOrderDto } from '../dto/request/create-order.dto';
 import { UpdateOrderDto } from '../dto/request/update-order.dto';
 import { Order, SubscriptionStatus } from '../schema/order.schema';
 import { ResponseDTO } from 'src/utils/response.dto';
 import { winstonLogger as logger } from 'src/common/winston-logger';
+import { PaginationDTO } from 'src/utils/pagination.dto';
+import { SearchOrdersDto } from '../dto/request/search-orders.dto';
 
 @Controller('orders')
 export class OrdersController {
@@ -20,15 +22,7 @@ export class OrdersController {
     return ResponseDTO.success(orders, 'Orders fetched successfully');
   }
 
-  /**
-   * Lấy thông tin đơn hàng theo ID
-   */
-  @Get(':id')
-  async findById(@Param('id') id: string): Promise<ResponseDTO<Order>> {
-    logger.info(`[Handler] Fetch Order: ${id}`);
-    const order = await this.ordersService.findById(id);
-    return ResponseDTO.success(order, 'Order fetched successfully');
-  }
+
 
   /**
    * Tạo mới một đơn hàng
@@ -76,5 +70,32 @@ export class OrdersController {
     logger.info(`[Handler] Delete Order: ${id}`);
     const result = await this.ordersService.delete(id);
     return ResponseDTO.success(result, 'Order deleted successfully');
+  }
+
+  /**
+   * Tìm kiếm đơn hàng với phân trang
+   * - Sử dụng query params `page`, `limit`, và `search`
+   */
+  @Get('search')
+  async searchOrders(
+    @Query() searchOrdersDto: SearchOrdersDto
+  ): Promise<ResponseDTO<PaginationDTO<Order>>> {
+    const result = await this.ordersService.findAllPaginated({
+      page: searchOrdersDto.page ?? 1,
+      limit: searchOrdersDto.limit ?? 10,
+      search: searchOrdersDto.search ?? '',
+      sortByDate: searchOrdersDto.sortByDate ?? false,
+    });
+    return ResponseDTO.success(result, 'Orders fetched successfully');
+  }
+
+  /**
+   * Lấy thông tin đơn hàng theo ID
+   */
+  @Get(':id')
+  async findById(@Param('id') id: string): Promise<ResponseDTO<Order>> {
+    logger.info(`[Handler] Fetch Order: ${id}`);
+    const order = await this.ordersService.findById(id);
+    return ResponseDTO.success(order, 'Order fetched successfully');
   }
 }
