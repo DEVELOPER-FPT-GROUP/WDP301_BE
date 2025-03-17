@@ -147,4 +147,8 @@ export class AccountsService implements IAccountService {
     return await this.createAccount(createAccountDto)
   }
 
+  async getTotalAccountsCreated(year: number, month: number): Promise<number> {
+    return (await this.accountsRepository.findAccountsByMonth(year, month)).length;
+  }
+
 }

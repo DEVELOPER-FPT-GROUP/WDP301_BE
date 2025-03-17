@@ -1,4 +1,3 @@
-import { PaginationDTO } from 'src/utils/pagination.dto';
 import { CreateAccountDto } from '../dto/request/create-account.dto';
 import { SearchAccountDto } from '../dto/request/search-account.dto';
 import { UpdateAccountDto } from '../dto/request/update-account.dto';
@@ -21,4 +20,6 @@ export interface IAccountService {
   createFamilyLeaderAccount(createAccountDto: CreateAccountDto): Promise<AccountResponseDto>;
 
   getAccountsWithPagination(searchDto: SearchAccountDto): Promise<PaginationDTO<AccountResponseDto>>;
+
+  getTotalAccountsCreated(year: number, month: number): Promise<number>
 }

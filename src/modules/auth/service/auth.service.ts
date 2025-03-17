@@ -50,19 +50,19 @@ export class AuthService implements IAuthService {
         const refreshToken = await this.generateToken(account, '7d');
 
         // Store refresh token in database
-        await this.accountsRepository.updateRefreshToken(String(account.memberId), refreshToken);
+        await this.accountsRepository.updateRefreshToken(String(account._id), refreshToken);
 
         return new AuthResponseDto(accessToken);
     }
 
     private async generateToken(account: Account, ttl: string): Promise<string> {
         const jti = crypto.randomUUID(); // Unique token ID
-        const member = await this.memberService.getMemberById(String(account.memberId));
+        const family = await this.familiesService.getFamilyByAdminAccountId(String(account._id));
 
         const payload = {
             username: account.username,
             memberId: account.memberId,
-            familyId: member.familyId,
+            familyId: family.familyId,
             jti,
             role: account.isAdmin ? 'admin' : 'member',
         };
