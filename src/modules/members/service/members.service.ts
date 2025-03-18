@@ -33,6 +33,7 @@ import { SearchMemberDto } from '../dto/request/search-member.dto';
 import { MulterFile } from '../../../common/types/multer-file.type';
 import { MediaResponseDto } from '../../media/dto/response/media-response.dto';
 import { MediaService } from '../../media/serivce/media.service';
+import { ChildDTO } from '../dto/response/child.dto';
 
 @Injectable()
 export class MembersService implements IMembersService {
@@ -53,6 +54,21 @@ export class MembersService implements IMembersService {
    * @returns The newly created member as a DTO.
    */
   async createMember(createMemberDto: CreateMemberDto, files: MulterFile[]): Promise<MemberDTO> {
+    console.log('createMemberDto:', createMemberDto);
+    const createdMember = await this.membersRepository.create(createMemberDto);
+
+    console.log("files: ", files);
+    let mediaList: MediaResponseDto[] = [];
+    if (files && files.length > 0) {
+      mediaList = await this.mediaService.uploadMultipleFiles(files, String(createdMember._id), 'Member');
+    }
+
+    const memberDTO = MemberDTO.map(createdMember);
+    memberDTO.media = mediaList;
+    return memberDTO;
+  }
+
+  async createRootMember(createMemberDto: CreateMemberDto, files: MulterFile[]): Promise<MemberDTO> {
     console.log('createMemberDto:', createMemberDto);
     const createdMember = await this.membersRepository.create(createMemberDto);
 
@@ -100,12 +116,6 @@ export class MembersService implements IMembersService {
     return members.map(member => MemberDTO.map(member));
   }
 
-  /**
-   * Updates a member's information.
-   * @param id - The unique identifier of the member.
-   * @param updateData - The data transfer object containing updated member details.
-   * @returns The updated member DTO if found, otherwise throws a NotFoundException.
-   */
   /**
    * Updates a member's information and allows updating media files.
    * @param id - The unique identifier of the member.
@@ -669,50 +679,60 @@ export class MembersService implements IMembersService {
     await this.accountsService.createAccount(createAccountDto);
   }
 
-  private async createSpouseMap(marriages: MarriageDTO[]): Promise<Map<string, SpouseDTO[]>> {
-    const spouseMap = new Map<string, SpouseDTO[]>();
+  private async createSpouseMap(marriages: MarriageDTO[], memberId: string): Promise<Map<string, any>> {
+    const spouseMap = new Map<string, any>();
 
-    // Tập hợp tất cả các ID cần lấy thông tin thành viên
-    const memberIds = new Set<string>();
+    console.log("marriages: ", marriages);
+    const listMapParents = new Map<string, string[]>();
+
+    // Create a map of (memberId <-> spouseId) pairs (handling multiple spouses)
     marriages.forEach(({ husbandId, wifeId }) => {
-      if (husbandId) memberIds.add(husbandId);
-      if (wifeId) memberIds.add(wifeId);
+      if (husbandId === memberId) {
+        if (!listMapParents.has(memberId)) listMapParents.set(memberId, []);
+        listMapParents.get(memberId)!.push(wifeId);
+      } else if (wifeId === memberId) {
+        if (!listMapParents.has(memberId)) listMapParents.set(memberId, []);
+        listMapParents.get(memberId)!.push(husbandId);
+      }
     });
 
-    // Lấy thông tin thành viên từ repository
-    const members = await this.membersRepository.findByIds(Array.from(memberIds));
-    const memberMap = new Map<string, MemberDTO>(members.map(member => [String(member._id), MemberDTO.map(member)]));
+    console.log("listMapParents:", listMapParents);
 
-    // Lấy danh sách con theo parentId
-    const childrenMap = await this.parentChildRelationshipsService.findChildrenByParentsId(Array.from(memberIds));
+    // Get spouse IDs
+    const spouseIds = listMapParents.get(memberId);
+    if (!spouseIds || spouseIds.length === 0) return spouseMap; // No spouse found
 
-    // Xây dựng spouse map
-    marriages.forEach(({ husbandId, wifeId }) => {
-      if (!husbandId || !wifeId) return; // Bỏ qua nếu thiếu ID
+    // Fetch member details
+    const member = await this.getMemberById(memberId);
+    if (!member) return spouseMap; // If member is missing, return empty map
 
-      const husband = memberMap.get(husbandId);
-      const wife = memberMap.get(wifeId);
+    const spouseList: { spouse: MemberDTO; children: ChildDTO[] }[] = [];
 
-      if (!husband || !wife) return; // Bỏ qua nếu không tìm thấy thông tin spouse
+    // Fetch each spouse and their children sequentially
+    for (const spouseId of spouseIds) {
+      const spouse = await this.getMemberById(spouseId);
+      if (!spouse) continue; // Skip if spouse not found
 
-      // Thêm wife vào danh sách spouse của husband
-      if (!spouseMap.has(husbandId)) spouseMap.set(husbandId, []);
-      spouseMap.get(husbandId)!.push({
-        wife,
-        children: childrenMap.get(husbandId) || []  // Luôn trả về mảng
+      // Fetch children for this member-spouse pair
+      const childrenMap = await this.parentChildRelationshipsService.findChildrenByParentsId([memberId, spouseId]);
+      const spouseChildren = childrenMap.get(memberId)?.filter(child =>
+        {
+          console.log("child: ", child);
+          return  childrenMap.get(spouse.memberId)?.some(spouseChild => spouseChild.child?.memberId === child.child?.memberId)
+        }
+      ) || [];
+
+      spouseList.push({
+        spouse: spouse,
+        children: spouseChildren
       });
+    }
 
-      // Thêm husband vào danh sách spouse của wife
-      if (!spouseMap.has(wifeId)) spouseMap.set(wifeId, []);
-      spouseMap.get(wifeId)!.push({
-        husband,
-        children: childrenMap.get(wifeId) || []  // Luôn trả về mảng
-      });
-    });
+    // Store the processed spouse list in the map
+    spouseMap.set(memberId, spouseList);
 
     return spouseMap;
   }
-
 
   /**
    * Creates a map linking each parent to their children.
@@ -832,7 +852,7 @@ export class MembersService implements IMembersService {
     const marriages = await this.marriagesService.getAllSpouses(memberIds);
 
     // Tạo map lookup cho spouse
-    const spouseMap = await this.createSpouseMap(marriages);
+    const spouseMap = await this.createSpouseMap(marriages, memberDTO.memberId);
     memberDTO.spouses = spouseMap.get(memberDTO.memberId) || [];
 
     // Lấy quan hệ cha mẹ - con cái

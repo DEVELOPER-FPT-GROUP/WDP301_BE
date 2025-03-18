@@ -67,7 +67,7 @@ export class MembersRepository {
   async findByIds(ids: string[]): Promise<Member[]> {
     if (!ids.length) return [];
 
-    return this.memberModel.find({ _id: { $in: ids.map(id => new mongoose.Types.ObjectId(id)) } }).exec();
+    return this.memberModel.find({ _id: { $in: ids.map(id => new mongoose.Types.ObjectId(id)) } }).lean().exec();
   }
 
 }
