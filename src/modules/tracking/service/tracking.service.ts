@@ -22,6 +22,31 @@ export class TrackingsService {
     return this.trackingsRepository.findAll();
   }
 
+
+  async findOne(): Promise<Tracking | null> {
+    return this.trackingsRepository.findOne();
+}
+
+  async create(data: Partial<Tracking>): Promise<Tracking> {
+    return this.trackingsRepository.create(data);
+  }
+
+  async updateTracking(id: string, updateData: Partial<Tracking>): Promise<Tracking | null> {
+    this.logger.log(`[Service] Updating tracking record with ID: ${id}`);
+
+    const updatedTracking = await this.trackingsRepository.update(id, updateData);
+
+    if (!updatedTracking) {
+        this.logger.error(`[Service] Failed to update tracking record with ID: ${id}`);
+        throw new NotFoundException(`Tracking record with ID ${id} not found.`);
+    }
+
+    this.logger.log(`[Service] Successfully updated tracking record with ID: ${id}`);
+    return updatedTracking;
+}
+
+
+
   /**
    * Tăng totalViews khi người dùng truy cập URL
    */
@@ -67,44 +92,58 @@ export class TrackingsService {
   /**
    * Cập nhật doanh thu khi trạng thái subscription thay đổi
    */
-  async updateRevenueForOrder(orderId: string, newStatus: SubscriptionStatus, price: number): Promise<Tracking> {
+  async updateRevenueForOrder(
+    orderId: string, 
+    newStatus: SubscriptionStatus, 
+    price: number
+): Promise<Tracking> {
     this.logger.log(`[Service] Updating revenue for Order ID: ${orderId}, Status: ${newStatus}`);
 
     let tracking = await this.trackingsRepository.findOne();
 
     if (!tracking) {
-      this.logger.warn('[Service] No tracking found, creating new tracking record');
-      tracking = await this.trackingsRepository.create({
-        totalViews: 0,
-        totalRevenue: 0,
-        revenueHistory: [],
-      });
+        this.logger.warn('[Service] No tracking found, creating new tracking record');
+        tracking = await this.trackingsRepository.create({
+            totalViews: 0,
+            totalRevenue: 0,
+            revenueHistory: [],
+            monthlyRevenue: new Map(),
+        });
     }
 
     if (newStatus === SubscriptionStatus.ACTIVE) {
-      tracking.revenueHistory.push({
-        orderId,
-        amount: price,
-        status: newStatus,
-        timestamp: new Date(),
-      });
+        const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format (2025-03)
 
-      tracking.totalRevenue += price;
+        tracking.revenueHistory.push({
+            orderId,
+            amount: price,
+            status: newStatus,
+            timestamp: new Date(),
+        });
+
+        tracking.totalRevenue += price;
+
+        // ✅ Ensure `monthlyRevenue` is updated correctly
+        tracking.monthlyRevenue.set(
+            currentMonth, 
+            (tracking.monthlyRevenue.get(currentMonth) || 0) + price
+        );
     }
 
     const updatedTracking = await this.trackingsRepository.update(tracking._id.toString(), {
-      totalRevenue: tracking.totalRevenue,
-      revenueHistory: tracking.revenueHistory,
+        totalRevenue: tracking.totalRevenue,
+        revenueHistory: tracking.revenueHistory,
+        monthlyRevenue: tracking.monthlyRevenue, // ✅ Update `monthlyRevenue`
     });
 
     if (!updatedTracking) {
-      this.logger.error(`[Service] Failed to update revenue for order ID: ${orderId}`);
-      throw new NotFoundException('Failed to update tracking revenue.');
+        this.logger.error(`[Service] Failed to update revenue for order ID: ${orderId}`);
+        throw new NotFoundException('Failed to update tracking revenue.');
     }
 
     this.logger.log(`[Service] Successfully updated revenue for order ID: ${orderId}`);
     return updatedTracking;
-  }
+}
 
   async removeRevenueForOrder(orderId: string): Promise<Tracking> {
     this.logger.log(`[Service] Removing revenue for Order ID: ${orderId}`);
@@ -157,31 +196,64 @@ export class TrackingsService {
   /**
    * Fetch total revenue and total views for each month (12 months)
    */
-  async getYearlyData(): Promise<{ views: number[]; revenue: number[] }> {
-    this.logger.log('[Service] Fetching yearly data for views and revenue');
+  async getYearlyData(): Promise<{
+    totalRevenue: number;
+    totalOrder: number;
+    orderInMonth: number;
+    revenueInMonth: number;
+    revenueInYear: { month: number; value: number }[];
+    orderInYear: { month: number; value: number }[];
+}> {
+    this.logger.log('[Service] Fetching yearly data for revenue and orders');
 
-    // Fetch tracking data (including views and revenue for all months)
+    // Fetch tracking data
     const tracking = await this.trackingsRepository.findOne();
 
     if (!tracking) {
-      return { views: new Array(12).fill(0), revenue: new Array(12).fill(0) };
+        return {
+            totalRevenue: 0,
+            totalOrder: 0,
+            orderInMonth: 0,
+            revenueInMonth: 0,
+            revenueInYear: Array.from({ length: 12 }, (_, i) => ({ month: i + 1, value: 0 })),
+            orderInYear: Array.from({ length: 12 }, (_, i) => ({ month: i + 1, value: 0 })),
+        };
     }
 
-    // Initialize arrays for views and revenue (12 months)
-    const views = new Array(12).fill(0);
-    const revenue = new Array(12).fill(0);
+    // Get current month and year
+    const currentDate = new Date();
+    const currentMonth = currentDate.getMonth() + 1; // 1-based month (Jan = 1)
+    const currentYear = currentDate.getFullYear();
+    const currentMonthKey = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
 
-    // Iterate over the last 12 months and aggregate data
-    for (let i = 0; i < 12; i++) {
-      const month = `2025-${String(i + 1).padStart(2, '0')}`; // Generate months in YYYY-MM format
+    // Extract total values
+    const totalRevenue = tracking.totalRevenue || 0;
+    const totalOrder = tracking.totalOrders || 0;
+    const orderInMonth = tracking.monthlyOrders?.get(currentMonthKey) || 0;
+    const revenueInMonth = tracking.monthlyRevenue?.get(currentMonthKey) || 0;
 
-      // Check and assign values to views and revenue
-      views[i] = tracking.monthlyViews.get(month) || 0;
-      revenue[i] = tracking.monthlyRevenue.get(month) || 0;
-    }
+    // Prepare revenue and order breakdowns for each month
+    const revenueInYear = Array.from({ length: 12 }, (_, i) => {
+        const monthKey = `${currentYear}-${String(i + 1).padStart(2, '0')}`;
+        return { month: i + 1, value: tracking.monthlyRevenue?.get(monthKey) || 0 };
+    });
 
-    return { views, revenue };
-  }
+    const orderInYear = Array.from({ length: 12 }, (_, i) => {
+        const monthKey = `${currentYear}-${String(i + 1).padStart(2, '0')}`;
+        return { month: i + 1, value: tracking.monthlyOrders?.get(monthKey) || 0 };
+    });
+
+    return {
+        totalRevenue,
+        totalOrder,
+        orderInMonth,
+        revenueInMonth,
+        revenueInYear,
+        orderInYear,
+    };
+}
 
 
+  
+  
 }

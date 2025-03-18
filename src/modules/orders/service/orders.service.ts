@@ -14,18 +14,41 @@ export class OrdersService {
     private readonly trackingsService: TrackingsService,
   ) { }
   async create(data: CreateOrderDto): Promise<Order> {
-    // Create the new order using the repository
+    // Create the order (No transaction)
     const newOrder = await this.ordersRepository.create(data);
+    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
 
-    // If the order status is ACTIVE, update the revenue
-    if (newOrder.status === SubscriptionStatus.ACTIVE) {
-      await this.trackingsService.updateRevenueForOrder(newOrder._id.toString(), newOrder.status, newOrder.price);
+    // Fetch or create tracking entry
+    let tracking = await this.trackingsService.findOne();
+    if (!tracking) {
+        tracking = await this.trackingsService.create({
+            totalOrders: 1,
+            totalViews: 0,
+            totalRevenue: 0,
+            revenueHistory: [],
+            monthlyOrders: new Map([[currentMonth, 1]])
+        });
+    } else {
+        // Update order count
+        tracking.monthlyOrders.set(currentMonth, (tracking.monthlyOrders.get(currentMonth) || 0) + 1);
+        tracking.totalOrders += 1;
+
+        await this.trackingsService.updateTracking(tracking._id.toString(), {
+            totalOrders: tracking.totalOrders,
+            monthlyOrders: tracking.monthlyOrders,
+        });
     }
 
-    // Return the newly created order
-    return newOrder;
-  }
+    if (newOrder.status === SubscriptionStatus.ACTIVE) {
+        await this.trackingsService.updateRevenueForOrder(newOrder._id.toString(), newOrder.status, newOrder.price);
+    }
 
+    return newOrder;
+}
+
+
+
+  
   async findById(id: string): Promise<Order> {
     const order = await this.ordersRepository.findById(id);
     if (!order) {
@@ -42,6 +65,7 @@ export class OrdersService {
    * Lấy danh sách đơn hàng có phân trang và tìm kiếm
    */
   async findAllPaginated(options: { page: number; limit: number; search: string; sortByDate: boolean }): Promise<PaginationDTO<Order>> {
+
     const { page = 1, limit = 10, search = '', sortByDate = false } = options;
 
     const filters: any = {};

@@ -1,5 +1,6 @@
 import { IsNumber, IsOptional } from 'class-validator';
 
+
 export class UpdateTrackingDto {
   @IsOptional()
   @IsNumber()
@@ -8,4 +9,10 @@ export class UpdateTrackingDto {
   @IsOptional()
   @IsNumber()
   totalRevenue?: number;
+
+  @IsOptional()
+  monthlyViews?: Map<string, number>;
+
+  @IsOptional()
+  monthlyRevenue?: Map<string, number>;
 }
