@@ -12,7 +12,7 @@ export class TrackingsService {
     private readonly trackingsRepository: TrackingsRepository,
     @Inject(forwardRef(() => OrdersService))
     private readonly ordersService: OrdersService,
-  ) {}
+  ) { }
 
   /**
    * Lấy tất cả dữ liệu tracking
@@ -27,11 +27,11 @@ export class TrackingsService {
    */
   async incrementTotalViews(): Promise<Tracking> {
     this.logger.log('[Service] Increment total views');
-  
+
     let tracking = await this.trackingsRepository.findOne();
-  
+
     const currentMonth = new Date().toISOString().slice(0, 7); // Get current month in YYYY-MM format
-  
+
     if (!tracking) {
       this.logger.warn('[Service] No tracking found, creating new tracking record');
       tracking = await this.trackingsRepository.create({
@@ -44,25 +44,25 @@ export class TrackingsService {
     } else {
       // Increment the view count for the current month
       tracking.monthlyViews.set(currentMonth, (tracking.monthlyViews.get(currentMonth) || 0) + 1);
-  
+
       // Increment the total view count
       tracking.totalViews += 1;
-  
+
       tracking = await this.trackingsRepository.update(tracking._id.toString(), {
         totalViews: tracking.totalViews,
         monthlyViews: tracking.monthlyViews, // Update the monthly view counts
       });
-  
+
       if (!tracking) {
         this.logger.error('[Service] Failed to update tracking total views');
         throw new Error('Failed to update tracking total views.');
       }
     }
-  
+
     return tracking;
   }
-  
-  
+
+
 
   /**
    * Cập nhật doanh thu khi trạng thái subscription thay đổi
@@ -106,6 +106,36 @@ export class TrackingsService {
     return updatedTracking;
   }
 
+  async removeRevenueForOrder(orderId: string): Promise<Tracking> {
+    this.logger.log(`[Service] Removing revenue for Order ID: ${orderId}`);
+
+    let tracking = await this.trackingsRepository.findOne();
+    if (!tracking) {
+      this.logger.warn('[Service] No tracking found, skipping revenue removal');
+      throw new NotFoundException('Tracking not found.');
+    }
+
+    // Lọc bỏ orderId khỏi revenueHistory
+    tracking.revenueHistory = tracking.revenueHistory.filter(entry => entry.orderId !== orderId);
+
+    // Cập nhật totalRevenue
+    tracking.totalRevenue = tracking.revenueHistory.reduce((sum, entry) => sum + entry.amount, 0);
+
+    const updatedTracking = await this.trackingsRepository.update(tracking._id.toString(), {
+      totalRevenue: tracking.totalRevenue,
+      revenueHistory: tracking.revenueHistory,
+    });
+
+    if (!updatedTracking) {
+      this.logger.error(`[Service] Failed to remove revenue for order ID: ${orderId}`);
+      throw new NotFoundException('Failed to update tracking revenue.');
+    }
+
+    this.logger.log(`[Service] Successfully removed revenue for order ID: ${orderId}`);
+    return updatedTracking;
+  }
+
+
   /**
    * Lấy tổng doanh thu theo tháng (có thể lọc theo tháng cụ thể)
    * @param month Chuỗi YYYY-MM để lọc theo tháng cụ thể (tuỳ chọn)
@@ -129,29 +159,29 @@ export class TrackingsService {
    */
   async getYearlyData(): Promise<{ views: number[]; revenue: number[] }> {
     this.logger.log('[Service] Fetching yearly data for views and revenue');
-  
+
     // Fetch tracking data (including views and revenue for all months)
     const tracking = await this.trackingsRepository.findOne();
-  
+
     if (!tracking) {
       return { views: new Array(12).fill(0), revenue: new Array(12).fill(0) };
     }
-  
+
     // Initialize arrays for views and revenue (12 months)
     const views = new Array(12).fill(0);
     const revenue = new Array(12).fill(0);
-  
+
     // Iterate over the last 12 months and aggregate data
     for (let i = 0; i < 12; i++) {
       const month = `2025-${String(i + 1).padStart(2, '0')}`; // Generate months in YYYY-MM format
-  
+
       // Check and assign values to views and revenue
       views[i] = tracking.monthlyViews.get(month) || 0;
       revenue[i] = tracking.monthlyRevenue.get(month) || 0;
     }
-  
+
     return { views, revenue };
   }
-  
-  
+
+
 }

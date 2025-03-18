@@ -12,20 +12,20 @@ export class OrdersService {
     private readonly ordersRepository: OrdersRepository,
     @Inject(forwardRef(() => TrackingsService))
     private readonly trackingsService: TrackingsService,
-  ) {}
+  ) { }
   async create(data: CreateOrderDto): Promise<Order> {
     // Create the new order using the repository
     const newOrder = await this.ordersRepository.create(data);
-  
+
     // If the order status is ACTIVE, update the revenue
     if (newOrder.status === SubscriptionStatus.ACTIVE) {
       await this.trackingsService.updateRevenueForOrder(newOrder._id.toString(), newOrder.status, newOrder.price);
     }
-  
+
     // Return the newly created order
     return newOrder;
   }
-  
+
   async findById(id: string): Promise<Order> {
     const order = await this.ordersRepository.findById(id);
     if (!order) {
@@ -105,16 +105,24 @@ export class OrdersService {
       throw new NotFoundException(`Subscription with ID ${id} not found`);
     }
 
+    const previousStatus = order.status; // Lưu trạng thái trước khi cập nhật
     const updatedOrder = await this.ordersRepository.update(id, { status: newStatus });
+
     if (!updatedOrder) {
       throw new NotFoundException(`Failed to update subscription status for order ID ${id}`);
     }
 
-    // Cập nhật doanh thu nếu trạng thái mới là `ACTIVE`
-    if (newStatus === SubscriptionStatus.ACTIVE) {
+    // Nếu trạng thái thay đổi từ ACTIVE → khác (cần xóa revenue cũ)
+    if (previousStatus === SubscriptionStatus.ACTIVE && newStatus !== SubscriptionStatus.ACTIVE) {
+      await this.trackingsService.removeRevenueForOrder(id);
+    }
+
+    // Nếu trạng thái thay đổi từ khác → ACTIVE (cần thêm revenue mới)
+    if (previousStatus !== SubscriptionStatus.ACTIVE && newStatus === SubscriptionStatus.ACTIVE) {
       await this.trackingsService.updateRevenueForOrder(id, newStatus, order.price);
     }
 
     return updatedOrder;
   }
+
 }
