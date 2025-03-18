@@ -100,11 +100,20 @@ export class MembersService implements IMembersService {
    * @returns The member DTO if found, otherwise throws a NotFoundException.
    */
   async getMemberById(id: string): Promise<MemberDTO> {
+    // Fetch member details
     const member = await this.membersRepository.findById(id);
     if (!member) {
       throw new NotFoundException('Member not found');
     }
-    return MemberDTO.map(member);
+
+    // Convert to DTO
+    const memberDTO = MemberDTO.map(member);
+
+    // Fetch media for this member
+    const mediaList = await this.mediaService.getMediaByOwners([id], 'Member');
+    memberDTO.media = mediaList.map(media => media.url); // Store only URLs
+
+    return memberDTO;
   }
 
   /**
@@ -261,11 +270,13 @@ export class MembersService implements IMembersService {
           isAlive: child.isAlive,
           dateOfBirth: child.dateOfBirth ? new Date(child.dateOfBirth).toISOString() : '',
           dateOfDeath: child.dateOfDeath ? new Date(child.dateOfDeath).toISOString() : '',
-          birthOrder: birthOrder || 0 // Default birthOrder to 0 if missing
+          ...(child.isDeleted ? {} : { birthOrder: birthOrder ?? 1 }) // Default 1, hide if deleted
         });
 
-        // Store birth order
-        birthOrderMap.set(String(childId), birthOrder || 0);
+        // Store birth order only if the child is not deleted
+        if (!child.isDeleted) {
+          birthOrderMap.set(String(childId), birthOrder ?? 1);
+        }
 
         // Track child-parent relationships
         if (!childParentMap.has(String(childId))) {
@@ -277,7 +288,7 @@ export class MembersService implements IMembersService {
 
     // **Sort children by birthOrder**
     childrenMap.forEach((children) => {
-      children.sort((a, b) => a.birthOrder - b.birthOrder);
+      children.sort((a, b) => (a.birthOrder ?? 1) - (b.birthOrder ?? 1));
     });
 
     // Create member data structure
@@ -297,7 +308,7 @@ export class MembersService implements IMembersService {
         relationships: [] as Array<{
           partner?: { id: string, name: string, gender: string, isSingle: boolean, isAlive: boolean, dateOfBirth: string, dateOfDeath: string | null, media: string[] };
           isMarried?: boolean;
-          children?: { id: string, name: string, generation: number, gender: string, isSingle: boolean, isAlive: boolean, dateOfBirth: string, dateOfDeath: string | null, birthOrder: number }[];
+          children?: { id: string, name: string, generation: number, gender: string, isSingle: boolean, isAlive: boolean, dateOfBirth: string, dateOfDeath: string | null, birthOrder?: number }[];
         }>
       };
 
@@ -312,11 +323,11 @@ export class MembersService implements IMembersService {
           // Attach birthOrder from birthOrderMap
           sharedChildren = sharedChildren.map(child => ({
             ...child,
-            birthOrder: birthOrderMap.get(child.id) || 0
+            ...(child.isDeleted ? {} : { birthOrder: birthOrderMap.get(child.id) ?? 1 }) // Default 1, hide if deleted
           }));
 
           // Sort children by birthOrder before adding to relationships
-          sharedChildren.sort((a, b) => a.birthOrder - b.birthOrder);
+          sharedChildren.sort((a, b) => (a.birthOrder ?? 1) - (b.birthOrder ?? 1));
 
           const spouseMedia = spouseMediaMap.get(spouse.id)?.map(media => media.url) || []; // Fetch media for spouse
 
@@ -384,9 +395,9 @@ export class MembersService implements IMembersService {
           rel.children = rel.children
             .map(child => ({
               ...constructHierarchy(child.id),
-              birthOrder: birthOrderMap.get(child.id) || 0
+              ...(child.isDeleted ? {} : { birthOrder: birthOrderMap.get(child.id) ?? 1 }) // Default 1, hide if deleted
             }))
-            .sort((a, b) => a.birthOrder - b.birthOrder)
+            .sort((a, b) => (a.birthOrder ?? 1) - (b.birthOrder ?? 1))
             .filter(Boolean);
         }
         return rel;
