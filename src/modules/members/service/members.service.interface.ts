@@ -12,6 +12,7 @@ import { MulterFile } from '../../../common/types/multer-file.type';
 
 export interface IMembersService {
   createMember(createMemberDto: CreateMemberDto, files: MulterFile[]): Promise<MemberDTO>;
+  createRootMember(createMemberDto: CreateMemberDto, files: MulterFile[]): Promise<MemberDTO>;
   findAllMembers(): Promise<MemberDTO[]>;
   getMemberById(id: string): Promise<MemberDTO>;
   updateMember(id: string, updateData: UpdateMemberDto, files?: MulterFile[]): Promise<MemberDTO>;

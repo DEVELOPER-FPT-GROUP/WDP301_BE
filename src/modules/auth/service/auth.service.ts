@@ -63,10 +63,14 @@ export class AuthService implements IAuthService {
         const jti = crypto.randomUUID(); // Unique token ID
         const family = await this.familiesRepository.findByAdminAccountId(String(account._id));
 
+        let member;
+        if(account.memberId) {
+            member = await this.memberService.getMemberById(String(account.memberId));
+        }
         const payload = {
             username: account.username,
             memberId: account.memberId ? account.memberId : null,
-            familyId: family ? String(family._id) : null,
+            familyId: family ? String(family._id) : member.familyId,
             jti,
             role: account.role,
         };

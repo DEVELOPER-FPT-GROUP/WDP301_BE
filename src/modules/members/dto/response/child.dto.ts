@@ -7,7 +7,6 @@ export class ChildDTO {
   constructor(childInfo: { child: MemberDTO , birthOrder: number }) {
     this.child = childInfo.child;
     this.birthOrder = childInfo.birthOrder;
-
   }
 
 }
