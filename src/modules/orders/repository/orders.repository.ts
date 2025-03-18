@@ -41,12 +41,13 @@ export class OrdersRepository {
     const skip = (page - 1) * limit;
 
     const [orders, total] = await Promise.all([
-      this.orderModel.find(filters).sort(sortOptions).skip(skip).limit(limit).select('-__v').lean().exec(),
+      this.orderModel.find(filters).sort(sortOptions).skip(skip).limit(limit).exec(),
       this.orderModel.countDocuments(filters),
     ]);
 
     return { records: orders, total };
   }
   
+
   
 }

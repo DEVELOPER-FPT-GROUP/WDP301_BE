@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, forwardRef, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { IAccountService } from './accounts.service.interface';
 import { AccountsRepository } from '../repository/accounts.repository';
@@ -11,10 +11,14 @@ import { Promise } from 'mongoose';
 import { SearchAccountDto } from '../dto/request/search-account.dto';
 import { PaginationDTO } from 'src/utils/pagination.dto';
 import { Role } from '../../../utils/enum';
+import { TrackingsService } from 'src/modules/tracking/service/tracking.service';
 
 @Injectable()
 export class AccountsService implements IAccountService {
-  constructor(private readonly accountsRepository: AccountsRepository) {
+  constructor(private readonly accountsRepository: AccountsRepository,
+    @Inject(forwardRef(() => TrackingsService))
+    private readonly trackingsService: TrackingsService
+  ) {
     this.ensureAdminAccount(); // Ensure admin account on service initialization
   }
 
@@ -76,19 +80,47 @@ export class AccountsService implements IAccountService {
    * @param dto - The account creation DTO.
    * @returns The created account response DTO.
    */
+  // async createAccount(dto: CreateAccountDto): Promise<AccountResponseDto> {
+  //   console.log("check dto", dto.passwordHash);
+  //   const hashedPassword = await bcrypt.hash(dto.passwordHash, 10);
+
+  //   // Generate a unique username
+  //   const uniqueUsername = await this.generateUniqueUsername(dto.username);
+
+  //   // Create account with hashed password and unique username
+  //   const accountEntity = AccountMapper.toEntity({ ...dto, username: uniqueUsername, passwordHash: hashedPassword });
+
+  //   // Save account through repository
+  //   const savedAccount = await this.accountsRepository.create(accountEntity);
+  //   await this.trackingsService.updateAccountStats();
+  //   return AccountMapper.toResponseDto(savedAccount);
+  // }
+
   async createAccount(dto: CreateAccountDto): Promise<AccountResponseDto> {
+    // Ensure password is defined and a string
+    if (!dto.passwordHash || typeof dto.passwordHash !== 'string') {
+        throw new Error('Password is required and must be a string.');
+    }
+
     const hashedPassword = await bcrypt.hash(dto.passwordHash, 10);
 
     // Generate a unique username
     const uniqueUsername = await this.generateUniqueUsername(dto.username);
 
     // Create account with hashed password and unique username
-    const accountEntity = AccountMapper.toEntity({ ...dto, username: uniqueUsername, passwordHash: hashedPassword });
+    const accountEntity = AccountMapper.toEntity({ 
+        ...dto, 
+        username: uniqueUsername, 
+        passwordHash: hashedPassword 
+    });
 
     // Save account through repository
     const savedAccount = await this.accountsRepository.create(accountEntity);
+    await this.trackingsService.updateAccountStats();
+
     return AccountMapper.toResponseDto(savedAccount);
-  }
+}
+
 
   /**
    * Generates a unique username by appending an incrementing index if necessary.

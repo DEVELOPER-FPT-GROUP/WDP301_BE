@@ -1,9 +1,10 @@
-import { Controller, Get, Logger, Query } from '@nestjs/common';
+import { Body, Controller, Get, Logger, NotFoundException, Param, Put, Query } from '@nestjs/common';
 import { TrackingsService } from '../service/tracking.service';
 import { ResponseDTO } from 'src/utils/response.dto';
 import { TrackingResponse } from '../dto/response/tracking.dto';
 import { UseInterceptors } from '@nestjs/common';
 import { LoggingInterceptor } from 'src/common/interceptors/logging.interceptor';
+import { UpdateTrackingDto } from '../dto/request/tracking-update.dto';
 
 @Controller('trackings')
 @UseInterceptors(LoggingInterceptor)
@@ -17,6 +18,19 @@ export class TrackingsController {
     this.logger.log('[Handler] Fetch All Trackings');
     const trackings = await this.trackingsService.findAll();
     return ResponseDTO.success(trackings, 'Trackings fetched successfully');
+  }
+
+  @Put('/:id')
+  async updateTracking(
+    @Param('id') id: string,
+    @Body() updateTrackingDto: UpdateTrackingDto
+  ): Promise<ResponseDTO<TrackingResponse>> {
+    this.logger.log(`[Handler] Update Tracking ID: ${id}`);
+    const updatedTracking = await this.trackingsService.updateTracking(id, updateTrackingDto);
+    if (!updatedTracking) {
+      throw new NotFoundException(`Tracking with ID ${id} not found`);
+    }
+    return ResponseDTO.success(updatedTracking, 'Tracking record updated successfully');
   }
 
   @Get('/increment-view')
@@ -43,10 +57,36 @@ export class TrackingsController {
   /**
    * Fetch total views and revenue for the last 12 months (one for each month)
    */
-  @Get('/yearly-data')
-  async getYearlyData(): Promise<ResponseDTO<{ views: number[]; revenue: number[] }>> {
-    this.logger.log('[Handler] Fetch Yearly Data for Views and Revenue');
+  @Get('/revenue-orders/summary')
+async getRevenueOrdersSummary(): Promise<ResponseDTO<{
+    totalRevenue: number;
+    totalOrder: number;
+    orderInMonth: number;
+    revenueInMonth: number;
+    revenueInYear: { month: number; value: number }[];
+    orderInYear: { month: number; value: number }[];
+}>> {
+    this.logger.log('[Handler] Fetch Revenue and Order Summary');
+    
     const yearlyData = await this.trackingsService.getYearlyData();
-    return ResponseDTO.success(yearlyData, 'Yearly data fetched successfully');
-  }
+    
+    return ResponseDTO.success(yearlyData, 'Revenue and order summary fetched successfully');
+}
+
+@Get('/families-accounts/summary')
+async getFamiliesAccountsSummary(): Promise<ResponseDTO<{
+    totalFamilies: number;
+    totalAccounts: number;
+    totalViews: number;
+    viewsInYear: { month: number; value: number }[];
+    accountsInYear: { month: number; value: number }[];
+}>> {
+    this.logger.log('[Handler] Fetch Family, Account, and View Summary');
+
+    const statsData = await this.trackingsService.getFamilyAndAccountStats();
+
+    return ResponseDTO.success(statsData, 'Family, account, and view summary fetched successfully');
+}
+
+
 }

@@ -12,19 +12,42 @@ export class OrdersService {
     private readonly ordersRepository: OrdersRepository,
     @Inject(forwardRef(() => TrackingsService))
     private readonly trackingsService: TrackingsService,
-  ) {}
+  ) { }
   async create(data: CreateOrderDto): Promise<Order> {
-    // Create the new order using the repository
+    // Create the order (No transaction)
     const newOrder = await this.ordersRepository.create(data);
-  
-    // If the order status is ACTIVE, update the revenue
-    if (newOrder.status === SubscriptionStatus.ACTIVE) {
-      await this.trackingsService.updateRevenueForOrder(newOrder._id.toString(), newOrder.status, newOrder.price);
+    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
+
+    // Fetch or create tracking entry
+    let tracking = await this.trackingsService.findOne();
+    if (!tracking) {
+        tracking = await this.trackingsService.create({
+            totalOrders: 1,
+            totalViews: 0,
+            totalRevenue: 0,
+            revenueHistory: [],
+            monthlyOrders: new Map([[currentMonth, 1]])
+        });
+    } else {
+        // Update order count
+        tracking.monthlyOrders.set(currentMonth, (tracking.monthlyOrders.get(currentMonth) || 0) + 1);
+        tracking.totalOrders += 1;
+
+        await this.trackingsService.updateTracking(tracking._id.toString(), {
+            totalOrders: tracking.totalOrders,
+            monthlyOrders: tracking.monthlyOrders,
+        });
     }
-  
-    // Return the newly created order
+
+    if (newOrder.status === SubscriptionStatus.ACTIVE) {
+        await this.trackingsService.updateRevenueForOrder(newOrder._id.toString(), newOrder.status, newOrder.price);
+    }
+
     return newOrder;
-  }
+}
+
+
+
   
   async findById(id: string): Promise<Order> {
     const order = await this.ordersRepository.findById(id);
@@ -42,6 +65,7 @@ export class OrdersService {
    * Lấy danh sách đơn hàng có phân trang và tìm kiếm
    */
   async findAllPaginated(options: { page: number; limit: number; search: string; sortByDate: boolean }): Promise<PaginationDTO<Order>> {
+
     const { page = 1, limit = 10, search = '', sortByDate = false } = options;
 
     const filters: any = {};
@@ -105,16 +129,24 @@ export class OrdersService {
       throw new NotFoundException(`Subscription with ID ${id} not found`);
     }
 
+    const previousStatus = order.status; // Lưu trạng thái trước khi cập nhật
     const updatedOrder = await this.ordersRepository.update(id, { status: newStatus });
+
     if (!updatedOrder) {
       throw new NotFoundException(`Failed to update subscription status for order ID ${id}`);
     }
 
-    // Cập nhật doanh thu nếu trạng thái mới là `ACTIVE`
-    if (newStatus === SubscriptionStatus.ACTIVE) {
+    // Nếu trạng thái thay đổi từ ACTIVE → khác (cần xóa revenue cũ)
+    if (previousStatus === SubscriptionStatus.ACTIVE && newStatus !== SubscriptionStatus.ACTIVE) {
+      await this.trackingsService.removeRevenueForOrder(id);
+    }
+
+    // Nếu trạng thái thay đổi từ khác → ACTIVE (cần thêm revenue mới)
+    if (previousStatus !== SubscriptionStatus.ACTIVE && newStatus === SubscriptionStatus.ACTIVE) {
       await this.trackingsService.updateRevenueForOrder(id, newStatus, order.price);
     }
 
     return updatedOrder;
   }
+
 }
