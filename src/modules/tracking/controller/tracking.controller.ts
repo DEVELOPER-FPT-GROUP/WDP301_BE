@@ -57,8 +57,8 @@ export class TrackingsController {
   /**
    * Fetch total views and revenue for the last 12 months (one for each month)
    */
-  @Get('/yearly-data')
-async getYearlyData(): Promise<ResponseDTO<{
+  @Get('/revenue-orders/summary')
+async getRevenueOrdersSummary(): Promise<ResponseDTO<{
     totalRevenue: number;
     totalOrder: number;
     orderInMonth: number;
@@ -66,11 +66,27 @@ async getYearlyData(): Promise<ResponseDTO<{
     revenueInYear: { month: number; value: number }[];
     orderInYear: { month: number; value: number }[];
 }>> {
-    this.logger.log('[Handler] Fetch Yearly Data for Revenue and Orders');
+    this.logger.log('[Handler] Fetch Revenue and Order Summary');
     
     const yearlyData = await this.trackingsService.getYearlyData();
     
-    return ResponseDTO.success(yearlyData, 'Yearly data fetched successfully');
+    return ResponseDTO.success(yearlyData, 'Revenue and order summary fetched successfully');
 }
+
+@Get('/families-accounts/summary')
+async getFamiliesAccountsSummary(): Promise<ResponseDTO<{
+    totalFamilies: number;
+    totalAccounts: number;
+    totalViews: number;
+    viewsInYear: { month: number; value: number }[];
+    accountsInYear: { month: number; value: number }[];
+}>> {
+    this.logger.log('[Handler] Fetch Family, Account, and View Summary');
+
+    const statsData = await this.trackingsService.getFamilyAndAccountStats();
+
+    return ResponseDTO.success(statsData, 'Family, account, and view summary fetched successfully');
+}
+
 
 }

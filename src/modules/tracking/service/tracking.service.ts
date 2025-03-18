@@ -1,8 +1,8 @@
 import { forwardRef, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { TrackingsRepository } from '../repository/tracking.repository';
-import { OrdersService } from '../../orders/service/orders.service';
 import { Tracking } from '../schema/tracking.schema';
 import { SubscriptionStatus } from '../../orders/schema/order.schema';
+import { FamiliesService } from 'src/modules/families/service/families.service';
 
 @Injectable()
 export class TrackingsService {
@@ -10,8 +10,8 @@ export class TrackingsService {
 
   constructor(
     private readonly trackingsRepository: TrackingsRepository,
-    @Inject(forwardRef(() => OrdersService))
-    private readonly ordersService: OrdersService,
+    @Inject(forwardRef(() => FamiliesService)) // ✅ Fix circular dependency
+    private readonly familiesService: FamiliesService
   ) { }
 
   /**
@@ -253,7 +253,85 @@ export class TrackingsService {
     };
 }
 
+async getFamilyAndAccountStats(): Promise<{
+  totalFamilies: number;
+  totalAccounts: number;
+  totalViews: number;
+  viewsInYear: { month: number; value: number }[];
+  accountsInYear: { month: number; value: number }[];
+}> {
+  this.logger.log('[Service] Fetching yearly data for families, accounts, and views');
 
-  
+  // Fetch tracking data
+  const tracking = await this.trackingsRepository.findOne();
+
+  if (!tracking) {
+      return {
+          totalFamilies: 0,
+          totalAccounts: 0,
+          totalViews: 0,
+          viewsInYear: Array.from({ length: 12 }, (_, i) => ({ month: i + 1, value: 0 })),
+          accountsInYear: Array.from({ length: 12 }, (_, i) => ({ month: i + 1, value: 0 })),
+      };
+  }
+
+  // Get total families and accounts from their respective services
+  const totalFamilies = (await this.familiesService.getAllFamilies()).length;
+  const totalAccounts = tracking.totalAccounts || 0;
+
+  // Get current year
+  const currentYear = new Date().getFullYear();
+
+  // Prepare viewsInYear and accountsInYear breakdowns for each month
+  const viewsInYear = Array.from({ length: 12 }, (_, i) => {
+      const monthKey = `${currentYear}-${String(i + 1).padStart(2, '0')}`;
+      return { month: i + 1, value: tracking.monthlyViews?.get(monthKey) || 0 };
+  });
+
+  const accountsInYear = Array.from({ length: 12 }, (_, i) => {
+      const monthKey = `${currentYear}-${String(i + 1).padStart(2, '0')}`;
+      return { month: i + 1, value: tracking.monthlyAccounts?.get(monthKey) || 0 };
+  });
+
+  return {
+      totalFamilies,
+      totalAccounts,
+      totalViews: tracking.totalViews || 0,
+      viewsInYear,
+      accountsInYear,
+  };
+}
+
+async updateAccountStats(): Promise<Tracking> {
+  this.logger.log(`[Service] Updating account statistics`);
+
+  let tracking = await this.trackingsRepository.findOne();
+  if (!tracking) {
+      this.logger.warn('[Service] No tracking found, creating new tracking record');
+      tracking = await this.trackingsRepository.create({
+          totalAccounts: 1,
+          monthlyAccounts: new Map(),
+      });
+  } else {
+      const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format (2025-03)
+
+      // Increment total accounts
+      tracking.totalAccounts += 1;
+
+      // Update monthly accounts count
+      tracking.monthlyAccounts.set(
+          currentMonth, 
+          (tracking.monthlyAccounts.get(currentMonth) || 0) + 1
+      );
+
+      await this.trackingsRepository.update(tracking._id.toString(), {
+          totalAccounts: tracking.totalAccounts,
+          monthlyAccounts: tracking.monthlyAccounts,
+      });
+  }
+
+  return tracking;
+}
+
   
 }
