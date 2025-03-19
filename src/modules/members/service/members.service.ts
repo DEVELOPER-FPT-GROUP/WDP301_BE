@@ -100,11 +100,20 @@ export class MembersService implements IMembersService {
    * @returns The member DTO if found, otherwise throws a NotFoundException.
    */
   async getMemberById(id: string): Promise<MemberDTO> {
+    // Fetch member details
     const member = await this.membersRepository.findById(id);
     if (!member) {
       throw new NotFoundException('Member not found');
     }
-    return MemberDTO.map(member);
+
+    // Convert to DTO
+    const memberDTO = MemberDTO.map(member);
+
+    // Fetch media for this member
+    const mediaList = await this.mediaService.getMediaByOwners([id], 'Member');
+    memberDTO.media = mediaList.map(media => media.url); // Store only URLs
+
+    return memberDTO;
   }
 
   /**
@@ -212,10 +221,14 @@ export class MembersService implements IMembersService {
 
     const marriages = await this.marriagesService.getAllSpouses(memberIds);
     const parentChildRelations = await this.parentChildRelationshipsService.findByChildIds(memberIds);
-    const mediaMap = await this.getMediaMap(memberIds); // Lấy media của các thành viên
+    const mediaMap = await this.getMediaMap(memberIds);
 
     // Create spouse map (handling multiple partners)
-    const spouseMap = new Map<string, { id: string, name: string, gender: string, isSingle: boolean, isAlive: boolean, dateOfBirth: string, dateOfDeath: string | null, deleted?: boolean }[]>();
+    const spouseMap = new Map<string, {
+      id: string, name: string, gender: string, isSingle: boolean, isAlive: boolean,
+      dateOfBirth: string, dateOfDeath: string | null, deleted?: boolean, media: string[]
+    }[]>();
+
     marriages.forEach(({ husbandId, wifeId }) => {
       const husband = members.find(m => String(m._id) === String(husbandId));
       const wife = members.find(m => String(m._id) === String(wifeId));
@@ -232,7 +245,8 @@ export class MembersService implements IMembersService {
           isAlive: wife.isAlive,
           dateOfBirth: wife.dateOfBirth ? new Date(wife.dateOfBirth).toISOString() : '',
           dateOfDeath: wife.dateOfDeath ? new Date(wife.dateOfDeath).toISOString() : '',
-          deleted: wife.isDeleted
+          deleted: wife.isDeleted,
+          media: mediaMap.get(String(wifeId))?.map(media => media.url) || []
         });
 
         spouseMap.get(String(wifeId))!.push({
@@ -243,7 +257,8 @@ export class MembersService implements IMembersService {
           isAlive: husband.isAlive,
           dateOfBirth: husband.dateOfBirth ? new Date(husband.dateOfBirth).toISOString() : '',
           dateOfDeath: husband.dateOfDeath ? new Date(husband.dateOfDeath).toISOString() : '',
-          deleted: husband.isDeleted
+          deleted: husband.isDeleted,
+          media: mediaMap.get(String(husbandId))?.map(media => media.url) || []
         });
       }
     });
@@ -263,7 +278,7 @@ export class MembersService implements IMembersService {
           childrenMap.set(parentKey, []);
         }
 
-        childrenMap.get(parentKey)!.push({
+        const childObject = {
           id: String(childId),
           name: `${child.firstName} ${child.middleName || ''} ${child.lastName}`.trim(),
           generation: child.generation,
@@ -272,11 +287,20 @@ export class MembersService implements IMembersService {
           isAlive: child.isAlive,
           dateOfBirth: child.dateOfBirth ? new Date(child.dateOfBirth).toISOString() : '',
           dateOfDeath: child.dateOfDeath ? new Date(child.dateOfDeath).toISOString() : '',
-          birthOrder: birthOrder || 0 // Default birthOrder to 0 if missing
-        });
+          media: mediaMap.get(String(childId))?.map(media => media.url) || []
+        };
+
+        // Only add birthOrder if the child has an ID
+        if (childId) {
+          (childObject as any).birthOrder = birthOrder || 0;
+        }
+
+        childrenMap.get(parentKey)!.push(childObject);
 
         // Store birth order
-        birthOrderMap.set(String(childId), birthOrder || 0);
+        if (childId) {
+          birthOrderMap.set(String(childId), birthOrder || 0);
+        }
 
         // Track child-parent relationships
         if (!childParentMap.has(String(childId))) {
@@ -287,8 +311,8 @@ export class MembersService implements IMembersService {
     });
 
     // **Sort children by birthOrder**
-    childrenMap.forEach((children, parentId) => {
-      children.sort((a, b) => (a.birthOrder - b.birthOrder));
+    childrenMap.forEach((children) => {
+      children.sort((a, b) => (a.birthOrder ?? 0) - (b.birthOrder ?? 0));
     });
 
     // Create member data structure
@@ -304,11 +328,11 @@ export class MembersService implements IMembersService {
         dateOfBirth: member.dateOfBirth ? new Date(member.dateOfBirth).toISOString() : '',
         dateOfDeath: member.dateOfDeath ? new Date(member.dateOfDeath).toISOString() : '',
         generation: member.generation,
-        media: mediaMap.get(String(member._id))?.map(media => media.url) || [], // Thêm media vào member
+        media: mediaMap.get(String(member._id))?.map(media => media.url) || [],
         relationships: [] as Array<{
-          partner?: { id: string, name: string, gender: string, isSingle: boolean, isAlive: boolean, dateOfBirth: string, dateOfDeath: string | null },
-          isMarried?: boolean,
-          children?: { id: string, name: string, generation: number, gender: string, isSingle: boolean, isAlive: boolean, dateOfBirth: string, dateOfDeath: string | null, birthOrder: number }[]
+          partner?: { id: string, name: string, gender: string, isSingle: boolean, isAlive: boolean, dateOfBirth: string, dateOfDeath: string | null, media: string[] };
+          isMarried?: boolean;
+          children?: { id: string, name: string, generation: number, gender: string, isSingle: boolean, isAlive: boolean, dateOfBirth: string, dateOfDeath: string | null, birthOrder?: number, media: string[] }[];
         }>
       };
 
@@ -320,36 +344,30 @@ export class MembersService implements IMembersService {
             childParentMap.get(child.id)!.includes(spouse.id)
           );
 
-          // Attach birthOrder from birthOrderMap
-          sharedChildren = sharedChildren.map(child => ({
-            ...child,
-            birthOrder: birthOrderMap.get(child.id) || 0
-          }));
+          // Only include birthOrder if the child has an ID
+          sharedChildren = sharedChildren.map(child => child.id ? { ...child, birthOrder: birthOrderMap.get(child.id) ?? 0 } : child);
 
-          // Sort children by birthOrder before adding to relationships
-          sharedChildren.sort((a, b) => a.birthOrder - b.birthOrder);
+          // Remove empty child objects
+          sharedChildren = sharedChildren.filter(child => child.id);
 
           if (!spouse.deleted) {
             hasVisiblePartner = true;
             memberData.relationships.push({
-              partner: spouse,
+              partner: {
+                ...spouse,
+                media: spouse.media || []
+              },
               isMarried: true,
               children: sharedChildren.length ? sharedChildren : undefined
             });
           } else if (sharedChildren.length > 0) {
-            // Partner is deleted, but children should remain in a separate object
-            memberData.relationships.push({
-              children: sharedChildren
-            });
+            memberData.relationships.push({ children: sharedChildren });
           }
         });
       }
 
-      // Remove "isMarried" if all partners are deleted
       if (!hasVisiblePartner) {
-        memberData.relationships.forEach(rel => {
-          delete rel.isMarried;
-        });
+        memberData.relationships.forEach(rel => delete rel.isMarried);
       }
 
       memberMap.set(memberData.id, memberData);
@@ -369,24 +387,13 @@ export class MembersService implements IMembersService {
 
       memberData.relationships = memberData.relationships.map(rel => {
         if (rel.partner) {
-          rel.partner = {
-            id: rel.partner.id,
-            name: rel.partner.name,
-            gender: rel.partner.gender,
-            isSingle: rel.partner.isSingle,
-            isAlive: rel.partner.isAlive,
-            dateOfBirth: rel.partner.dateOfBirth,
-            dateOfDeath: rel.partner.dateOfDeath
-          };
+          rel.partner.media = rel.partner.media || [];
         }
         if (rel.children) {
           rel.children = rel.children
-            .map(child => ({
-              ...constructHierarchy(child.id),
-              birthOrder: birthOrderMap.get(child.id) || 0
-            }))
-            .sort((a, b) => a.birthOrder - b.birthOrder)
-            .filter(Boolean);
+            .map(child => (child.id ? { ...constructHierarchy(child.id), birthOrder: birthOrderMap.get(child.id) ?? 0 } : child))
+            .sort((a, b) => (a.birthOrder ?? 0) - (b.birthOrder ?? 0))
+            .filter(child => child.id);
         }
         return rel;
       }).filter(Boolean);
