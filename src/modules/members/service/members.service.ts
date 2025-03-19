@@ -149,10 +149,12 @@ export class MembersService implements IMembersService {
     // Handle media deletion if requested
     if (updateData.deleteImageIds && updateData.deleteImageIds.length > 0) {
 
-      try {
-        await Promise.all(updateData.deleteImageIds.map(imageId => this.mediaService.deleteMedia(imageId)));
-      } catch (error) {
-        throw new BadRequestException(`Failed to delete images: ${error.message}`);
+      for (const imageId of updateData.deleteImageIds) {
+        try {
+          await this.mediaService.deleteMedia(imageId);
+        } catch (error) {
+          throw new BadRequestException(`Failed to delete image: ${error.message}`);
+        }
       }
     }
 
