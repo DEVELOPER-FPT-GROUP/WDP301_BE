@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { IMembersService } from './members.service.interface';
 import { CreateMemberDto } from '../dto/request/create-member.dto';
 import { MemberDTO } from '../dto/response/member.dto';
@@ -111,7 +111,12 @@ export class MembersService implements IMembersService {
 
     // Fetch media for this member
     const mediaList = await this.mediaService.getMediaByOwners([id], 'Member');
-    memberDTO.media = mediaList.map(media => media.url); // Store only URLs
+    memberDTO.media = mediaList.map(media => {
+      return {
+        id: media.mediaId,
+        url: media.url,
+      }
+    }); // Store only URLs
 
     return memberDTO;
   }
@@ -139,23 +144,38 @@ export class MembersService implements IMembersService {
       throw new NotFoundException('Member not found');
     }
 
+    let mediaList: MediaResponseDto[] = [];
+
+    // Handle media deletion if requested
+    if (updateData.deleteImageIds && updateData.deleteImageIds.length > 0) {
+
+      try {
+        await Promise.all(updateData.deleteImageIds.map(imageId => this.mediaService.deleteMedia(imageId)));
+      } catch (error) {
+        throw new BadRequestException(`Failed to delete images: ${error.message}`);
+      }
+    }
+
+    // Upload new files if needed
+    if (updateData.isChangeImage && files && files.length > 0) {
+
+      try {
+        mediaList = await this.mediaService.uploadMultipleFiles(files, String(existingMember._id), 'Member');
+      } catch (error) {
+        throw new BadRequestException(`Failed to upload new files: ${error.message}`);
+      }
+    } else {
+      // If no new files, retrieve existing media
+      mediaList = await this.mediaService.getMediaByOwners([String(existingMember._id)], 'Member');
+    }
+
     // Update the member details
     const updatedMember = await this.membersRepository.update(id, updateData);
     if (!updatedMember) {
       throw new NotFoundException('Member not found after update');
     }
 
-    let mediaList: MediaResponseDto[] = [];
-
-    // If new media files are provided, upload them
-    if (files && files.length > 0) {
-      mediaList = await this.mediaService.uploadMultipleFiles(files, String(updatedMember._id), 'Member');
-    } else {
-      // Retrieve existing media if no new files are uploaded
-      mediaList = await this.mediaService.getMediaByOwners([String(updatedMember._id)], 'Member');
-    }
-
-    // Convert updated member to DTO and attach media
+    // Convert updated member to DTO and attach media URLs
     const memberDTO = MemberDTO.map(updatedMember);
     memberDTO.media = mediaList.map(media => media.url); // Return only media URLs
 
