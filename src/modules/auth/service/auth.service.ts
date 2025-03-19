@@ -70,7 +70,7 @@ export class AuthService implements IAuthService {
         const payload = {
             username: account.username,
             memberId: account.memberId ? account.memberId : null,
-            familyId: family ? String(family._id) : member.familyId,
+            familyId: family ? String(family._id) : (member ? member.familyId : null),
             jti,
             role: account.role,
         };
