@@ -11,7 +11,7 @@ import { UpdateTrackingDto } from '../dto/request/tracking-update.dto';
 export class TrackingsController {
   private readonly logger = new Logger(TrackingsController.name);
 
-  constructor(private readonly trackingsService: TrackingsService) {}
+  constructor(private readonly trackingsService: TrackingsService) { }
 
   @Get()
   async findAll(): Promise<ResponseDTO<TrackingResponse[]>> {
@@ -58,35 +58,36 @@ export class TrackingsController {
    * Fetch total views and revenue for the last 12 months (one for each month)
    */
   @Get('/revenue-orders/summary')
-async getRevenueOrdersSummary(): Promise<ResponseDTO<{
+  async getRevenueOrdersSummary(): Promise<ResponseDTO<{
     totalRevenue: number;
     totalOrder: number;
     orderInMonth: number;
     revenueInMonth: number;
     revenueInYear: { month: number; value: number }[];
     orderInYear: { month: number; value: number }[];
-}>> {
+  }>> {
     this.logger.log('[Handler] Fetch Revenue and Order Summary');
-    
-    const yearlyData = await this.trackingsService.getYearlyData();
-    
-    return ResponseDTO.success(yearlyData, 'Revenue and order summary fetched successfully');
-}
 
-@Get('/families-accounts/summary')
-async getFamiliesAccountsSummary(): Promise<ResponseDTO<{
+    const yearlyData = await this.trackingsService.getYearlyData();
+
+    return ResponseDTO.success(yearlyData, 'Revenue and order summary fetched successfully');
+  }
+
+  @Get('/families-accounts/summary')
+  async getFamiliesAccountsSummary(): Promise<ResponseDTO<{
     totalFamilies: number;
     totalAccounts: number;
     totalViews: number;
+    accountsInMonth: number;
     viewsInYear: { month: number; value: number }[];
     accountsInYear: { month: number; value: number }[];
-}>> {
+  }>> {
     this.logger.log('[Handler] Fetch Family, Account, and View Summary');
 
     const statsData = await this.trackingsService.getFamilyAndAccountStats();
 
     return ResponseDTO.success(statsData, 'Family, account, and view summary fetched successfully');
-}
+  }
 
 
 }

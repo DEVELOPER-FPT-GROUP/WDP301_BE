@@ -25,7 +25,7 @@ export class TrackingsService {
 
   async findOne(): Promise<Tracking | null> {
     return this.trackingsRepository.findOne();
-}
+  }
 
   async create(data: Partial<Tracking>): Promise<Tracking> {
     return this.trackingsRepository.create(data);
@@ -37,13 +37,13 @@ export class TrackingsService {
     const updatedTracking = await this.trackingsRepository.update(id, updateData);
 
     if (!updatedTracking) {
-        this.logger.error(`[Service] Failed to update tracking record with ID: ${id}`);
-        throw new NotFoundException(`Tracking record with ID ${id} not found.`);
+      this.logger.error(`[Service] Failed to update tracking record with ID: ${id}`);
+      throw new NotFoundException(`Tracking record with ID ${id} not found.`);
     }
 
     this.logger.log(`[Service] Successfully updated tracking record with ID: ${id}`);
     return updatedTracking;
-}
+  }
 
 
 
@@ -93,57 +93,57 @@ export class TrackingsService {
    * Cập nhật doanh thu khi trạng thái subscription thay đổi
    */
   async updateRevenueForOrder(
-    orderId: string, 
-    newStatus: SubscriptionStatus, 
+    orderId: string,
+    newStatus: SubscriptionStatus,
     price: number
-): Promise<Tracking> {
+  ): Promise<Tracking> {
     this.logger.log(`[Service] Updating revenue for Order ID: ${orderId}, Status: ${newStatus}`);
 
     let tracking = await this.trackingsRepository.findOne();
 
     if (!tracking) {
-        this.logger.warn('[Service] No tracking found, creating new tracking record');
-        tracking = await this.trackingsRepository.create({
-            totalViews: 0,
-            totalRevenue: 0,
-            revenueHistory: [],
-            monthlyRevenue: new Map(),
-        });
+      this.logger.warn('[Service] No tracking found, creating new tracking record');
+      tracking = await this.trackingsRepository.create({
+        totalViews: 0,
+        totalRevenue: 0,
+        revenueHistory: [],
+        monthlyRevenue: new Map(),
+      });
     }
 
     if (newStatus === SubscriptionStatus.ACTIVE) {
-        const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format (2025-03)
+      const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format (2025-03)
 
-        tracking.revenueHistory.push({
-            orderId,
-            amount: price,
-            status: newStatus,
-            timestamp: new Date(),
-        });
+      tracking.revenueHistory.push({
+        orderId,
+        amount: price,
+        status: newStatus,
+        timestamp: new Date(),
+      });
 
-        tracking.totalRevenue += price;
+      tracking.totalRevenue += price;
 
-        // ✅ Ensure `monthlyRevenue` is updated correctly
-        tracking.monthlyRevenue.set(
-            currentMonth, 
-            (tracking.monthlyRevenue.get(currentMonth) || 0) + price
-        );
+      // ✅ Ensure `monthlyRevenue` is updated correctly
+      tracking.monthlyRevenue.set(
+        currentMonth,
+        (tracking.monthlyRevenue.get(currentMonth) || 0) + price
+      );
     }
 
     const updatedTracking = await this.trackingsRepository.update(tracking._id.toString(), {
-        totalRevenue: tracking.totalRevenue,
-        revenueHistory: tracking.revenueHistory,
-        monthlyRevenue: tracking.monthlyRevenue, // ✅ Update `monthlyRevenue`
+      totalRevenue: tracking.totalRevenue,
+      revenueHistory: tracking.revenueHistory,
+      monthlyRevenue: tracking.monthlyRevenue, // ✅ Update `monthlyRevenue`
     });
 
     if (!updatedTracking) {
-        this.logger.error(`[Service] Failed to update revenue for order ID: ${orderId}`);
-        throw new NotFoundException('Failed to update tracking revenue.');
+      this.logger.error(`[Service] Failed to update revenue for order ID: ${orderId}`);
+      throw new NotFoundException('Failed to update tracking revenue.');
     }
 
     this.logger.log(`[Service] Successfully updated revenue for order ID: ${orderId}`);
     return updatedTracking;
-}
+  }
 
   async removeRevenueForOrder(orderId: string): Promise<Tracking> {
     this.logger.log(`[Service] Removing revenue for Order ID: ${orderId}`);
@@ -203,21 +203,21 @@ export class TrackingsService {
     revenueInMonth: number;
     revenueInYear: { month: number; value: number }[];
     orderInYear: { month: number; value: number }[];
-}> {
+  }> {
     this.logger.log('[Service] Fetching yearly data for revenue and orders');
 
     // Fetch tracking data
     const tracking = await this.trackingsRepository.findOne();
 
     if (!tracking) {
-        return {
-            totalRevenue: 0,
-            totalOrder: 0,
-            orderInMonth: 0,
-            revenueInMonth: 0,
-            revenueInYear: Array.from({ length: 12 }, (_, i) => ({ month: i + 1, value: 0 })),
-            orderInYear: Array.from({ length: 12 }, (_, i) => ({ month: i + 1, value: 0 })),
-        };
+      return {
+        totalRevenue: 0,
+        totalOrder: 0,
+        orderInMonth: 0,
+        revenueInMonth: 0,
+        revenueInYear: Array.from({ length: 12 }, (_, i) => ({ month: i + 1, value: 0 })),
+        orderInYear: Array.from({ length: 12 }, (_, i) => ({ month: i + 1, value: 0 })),
+      };
     }
 
     // Get current month and year
@@ -234,85 +234,89 @@ export class TrackingsService {
 
     // Prepare revenue and order breakdowns for each month
     const revenueInYear = Array.from({ length: 12 }, (_, i) => {
-        const monthKey = `${currentYear}-${String(i + 1).padStart(2, '0')}`;
-        return { month: i + 1, value: tracking.monthlyRevenue?.get(monthKey) || 0 };
+      const monthKey = `${currentYear}-${String(i + 1).padStart(2, '0')}`;
+      return { month: i + 1, value: tracking.monthlyRevenue?.get(monthKey) || 0 };
     });
 
     const orderInYear = Array.from({ length: 12 }, (_, i) => {
-        const monthKey = `${currentYear}-${String(i + 1).padStart(2, '0')}`;
-        return { month: i + 1, value: tracking.monthlyOrders?.get(monthKey) || 0 };
+      const monthKey = `${currentYear}-${String(i + 1).padStart(2, '0')}`;
+      return { month: i + 1, value: tracking.monthlyOrders?.get(monthKey) || 0 };
     });
 
     return {
-        totalRevenue,
-        totalOrder,
-        orderInMonth,
-        revenueInMonth,
-        revenueInYear,
-        orderInYear,
+      totalRevenue,
+      totalOrder,
+      orderInMonth,
+      revenueInMonth,
+      revenueInYear,
+      orderInYear,
     };
-}
-
-async getFamilyAndAccountStats(): Promise<{
-  totalFamilies: number;
-  totalAccounts: number;
-  totalViews: number;
-  viewsInYear: { month: number; value: number }[];
-  accountsInYear: { month: number; value: number }[];
-}> {
-  this.logger.log('[Service] Fetching yearly data for families, accounts, and views');
-
-  // Fetch tracking data
-  const tracking = await this.trackingsRepository.findOne();
-
-  if (!tracking) {
-      return {
-          totalFamilies: 0,
-          totalAccounts: 0,
-          totalViews: 0,
-          viewsInYear: Array.from({ length: 12 }, (_, i) => ({ month: i + 1, value: 0 })),
-          accountsInYear: Array.from({ length: 12 }, (_, i) => ({ month: i + 1, value: 0 })),
-      };
   }
 
-  // Get total families and accounts from their respective services
-  const totalFamilies = (await this.familiesService.getAllFamilies()).length;
-  const totalAccounts = tracking.totalAccounts || 0;
+  async getFamilyAndAccountStats(): Promise<{
+    totalFamilies: number;
+    totalAccounts: number;
+    totalViews: number;
+    accountsInMonth: number;
+    viewsInYear: { month: number; value: number }[];
+    accountsInYear: { month: number; value: number }[];
+  }> {
+    this.logger.log('[Service] Fetching yearly data for families, accounts, and views');
 
-  // Get current year
-  const currentYear = new Date().getFullYear();
+    // Fetch tracking data
+    const tracking = await this.trackingsRepository.findOne();
 
-  // Prepare viewsInYear and accountsInYear breakdowns for each month
-  const viewsInYear = Array.from({ length: 12 }, (_, i) => {
+    if (!tracking) {
+      return {
+        totalFamilies: 0,
+        totalAccounts: 0,
+        totalViews: 0,
+        accountsInMonth: 0,
+        viewsInYear: Array.from({ length: 12 }, (_, i) => ({ month: i + 1, value: 0 })),
+        accountsInYear: Array.from({ length: 12 }, (_, i) => ({ month: i + 1, value: 0 })),
+      };
+    }
+
+    // Get total families and accounts from their respective services
+    const totalFamilies = (await this.familiesService.getAllFamilies()).length;
+    const totalAccounts = tracking.totalAccounts || 0;
+
+    // Get current year
+    const currentYear = new Date().getFullYear();
+
+    // Prepare viewsInYear and accountsInYear breakdowns for each month
+    const viewsInYear = Array.from({ length: 12 }, (_, i) => {
       const monthKey = `${currentYear}-${String(i + 1).padStart(2, '0')}`;
       return { month: i + 1, value: tracking.monthlyViews?.get(monthKey) || 0 };
-  });
+    });
 
-  const accountsInYear = Array.from({ length: 12 }, (_, i) => {
+    const accountsInYear = Array.from({ length: 12 }, (_, i) => {
       const monthKey = `${currentYear}-${String(i + 1).padStart(2, '0')}`;
       return { month: i + 1, value: tracking.monthlyAccounts?.get(monthKey) || 0 };
-  });
+    });
 
-  return {
+    return {
       totalFamilies,
       totalAccounts,
       totalViews: tracking.totalViews || 0,
+      accountsInMonth: tracking.monthlyAccounts?.get(`${currentYear}-${String(new Date().getMonth() + 1).padStart(2, '0')}`) || 0,
       viewsInYear,
       accountsInYear,
-  };
-}
+    };
+  }
 
-async updateAccountStats(): Promise<Tracking> {
-  this.logger.log(`[Service] Updating account statistics`);
 
-  let tracking = await this.trackingsRepository.findOne();
-  if (!tracking) {
+  async updateAccountStats(): Promise<Tracking> {
+    this.logger.log(`[Service] Updating account statistics`);
+
+    let tracking = await this.trackingsRepository.findOne();
+    if (!tracking) {
       this.logger.warn('[Service] No tracking found, creating new tracking record');
       tracking = await this.trackingsRepository.create({
-          totalAccounts: 1,
-          monthlyAccounts: new Map(),
+        totalAccounts: 1,
+        monthlyAccounts: new Map(),
       });
-  } else {
+    } else {
       const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format (2025-03)
 
       // Increment total accounts
@@ -320,18 +324,18 @@ async updateAccountStats(): Promise<Tracking> {
 
       // Update monthly accounts count
       tracking.monthlyAccounts.set(
-          currentMonth, 
-          (tracking.monthlyAccounts.get(currentMonth) || 0) + 1
+        currentMonth,
+        (tracking.monthlyAccounts.get(currentMonth) || 0) + 1
       );
 
       await this.trackingsRepository.update(tracking._id.toString(), {
-          totalAccounts: tracking.totalAccounts,
-          monthlyAccounts: tracking.monthlyAccounts,
+        totalAccounts: tracking.totalAccounts,
+        monthlyAccounts: tracking.monthlyAccounts,
       });
+    }
+
+    return tracking;
   }
 
-  return tracking;
-}
 
-  
 }
