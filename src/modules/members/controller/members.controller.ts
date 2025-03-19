@@ -49,7 +49,7 @@ export class MembersController {
         })
     ) files: { files?: MulterFile[] }
   ): Promise<ResponseDTO<MemberDTO>> {
-    const result = await this.membersService.createMember(createMemberDto, files?.files || []);
+    const result = await this.membersService.createRootMember(createMemberDto, files?.files || []);
     return ResponseDTO.success(result, 'Member created successfully');
   }
 
