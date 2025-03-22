@@ -7,5 +7,5 @@ export interface FaceDetectionResult {
 }
 
 export interface IFaceDetectionService {
-  detectAndCropFace(file: MulterFile): Promise<FaceDetectionResult>;
+  detectAndCropFaces(file: MulterFile): Promise<FaceDetectionResult[]>;
 }

@@ -186,53 +186,70 @@ export class MediaService {
     file: MulterFile,
     ownerId: string,
     ownerType: 'Member',
-  ): Promise<MediaResponseDto> {
+  ): Promise<MediaResponseDto[]> {
     if (!file) {
       throw new BadRequestException('Avatar file is required');
     }
-
+  
     try {
-      logger.http(`Processing avatar for ${ownerType} with ID: ${ownerId}`);
-
-      // Detect and crop face
-      const faceDetectionResult =
-        await this.faceDetectionService.detectAndCropFace(file);
-      if (!faceDetectionResult.success || !faceDetectionResult.faceBuffer) {
-        throw new BadRequestException(
-          faceDetectionResult.message || 'Face detection failed',
-        );
+      logger.http(`Processing avatar(s) for ${ownerType} with ID: ${ownerId}`);
+  
+      // Detect and crop multiple faces
+      const faceDetectionResults = await this.faceDetectionService.detectAndCropFaces(file);
+  
+      if (!faceDetectionResults.length) {
+        throw new BadRequestException('No faces detected in the image.');
       }
-
-      // Upload processed avatar to Cloudinary
-      const uploadResult = await this.cloudinaryService.uploadFile({
-        ...file,
-        buffer: faceDetectionResult.faceBuffer,
-        mimetype: 'image/png',
-        originalname: file.originalname.replace(/\.\w+$/, '.png'),
-      });
-
-      // Save metadata in MongoDB
-      const mediaEntity = MediaMapper.toEntityFromFile({
-        ownerId,
-        ownerType,
-        fileName: uploadResult.originalname,
-        mimeType: 'image/png',
-        size: file.size,
-        url: uploadResult.secure_url,
-      });
-
-      const media = await this.mediaRepository.create(mediaEntity);
-      logger.info(
-        `✅ Avatar processed and uploaded successfully for ${ownerType} ID: ${ownerId}`,
+  
+      logger.info(`✅ Detected ${faceDetectionResults.length} face(s) for ${ownerType} ID: ${ownerId}`);
+  
+      // Upload each detected face to Cloudinary
+      const uploadResults = await Promise.all(
+        faceDetectionResults.map(async (face, index) => {
+          const uploadResult = await this.cloudinaryService.uploadFile({
+            ...file,
+            buffer: face.faceBuffer ?? Buffer.alloc(0), // ✅ Ensures buffer is always defined
+            mimetype: 'image/png',
+            originalname: `avatar_${ownerId}_${index + 1}.png`,
+          });
+  
+          if (!uploadResult || !uploadResult.secure_url) {
+            throw new BadRequestException(`Failed to upload avatar ${index + 1} to Cloudinary.`);
+          }
+  
+          return {
+            fileName: `avatar_${ownerId}_${index + 1}.png`,
+            url: uploadResult.secure_url,
+          };
+        })
       );
-      return MediaMapper.toResponseDto(media);
+  
+      // Save all uploaded avatars to MongoDB
+      const mediaEntities = uploadResults.map(uploadResult =>
+        MediaMapper.toEntityFromFile({
+          ownerId,
+          ownerType,
+          fileName: uploadResult.fileName,
+          mimeType: 'image/png',
+          size: file.size,
+          url: uploadResult.url,
+        })
+      );
+  
+      const mediaList = await this.mediaRepository.createMany(mediaEntities);
+  
+      logger.info(
+        `✅ Successfully processed and uploaded ${mediaList.length} avatar(s) for ${ownerType} ID: ${ownerId}`
+      );
+  
+      return mediaList.map(MediaMapper.toResponseDto);
     } catch (error) {
       logger.error(`❌ Avatar processing error: ${error.message}`);
-      throw new BadRequestException(
-        `Failed to process avatar: ${error.message}`,
-      );
+      throw new BadRequestException(`Failed to process avatar: ${error.message}`);
     }
   }
+  
+  
   /**
    * Delete multiple media records by IDs
    */
