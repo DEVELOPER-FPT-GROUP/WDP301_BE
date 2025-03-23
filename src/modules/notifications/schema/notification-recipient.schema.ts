@@ -1,21 +1,21 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
-import crypto from 'crypto';
+import * as crypto from 'crypto';
 
 export type NotificationRecipientDocument = HydratedDocument<NotificationRecipient>;
 
 @Schema({ timestamps: { createdAt: 'createdAt', updatedAt: 'updatedAt' } })
 export class NotificationRecipient {
-  @Prop({ required: true, unique: true, index: true })
+  @Prop()
   recipientId: string; // Auto-generated
 
-  @Prop({ required: true })
+  @Prop()
   notificationId: string; // Related Notification ID
 
-  @Prop({ required: true })
+  @Prop()
   recipientAccountId: string; // User ID of the recipient
 
-  @Prop({ required: true, enum: ['Email', 'Push Notification', 'In-App'] })
+  @Prop()
   sentVia: string;
 
   @Prop({ default: false })

@@ -16,6 +16,7 @@ import { memoryStorage } from 'multer';
 import { AiFaceDetectionModule } from './modules/ai-face-detection/ai-face-detection.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { TrackingsModule } from './modules/tracking/tracking.module';
+import { NotificationModule } from './modules/notifications/notifications.module';
 
 @Module({
   imports: [
@@ -44,7 +45,8 @@ import { TrackingsModule } from './modules/tracking/tracking.module';
     AuthModule,
     AiFaceDetectionModule,
     OrdersModule,
-    TrackingsModule
+    TrackingsModule,
+    NotificationModule
   ],
 })
 export class AppModule {}

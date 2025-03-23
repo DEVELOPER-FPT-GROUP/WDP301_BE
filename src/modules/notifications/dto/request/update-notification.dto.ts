@@ -1,5 +1,5 @@
 import { IsOptional, IsEnum, IsArray, IsNotEmpty } from 'class-validator';
-import { NotificationType } from '../schema/notification.schema';
+import { NotificationType } from '../../../../utils/enum';
 
 export class UpdateNotificationDto {
   @IsOptional()
@@ -17,5 +17,5 @@ export class UpdateNotificationDto {
 
   @IsArray()
   @IsOptional()
-  recipientAccountIds?: string[]; // Optional list to update recipients
+  recipientAccountIds?: string[];
 }
