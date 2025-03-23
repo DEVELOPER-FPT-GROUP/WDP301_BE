@@ -12,6 +12,7 @@ import { AccountResponseDto } from '../dto/response/account.dto';
 import { PaginationDTO } from 'src/utils/pagination.dto';
 import { SearchAccountDto } from '../dto/request/search-account.dto';
 import { FamiliesService } from '../../families/service/families.service';
+import { ChangePasswordDto } from '../dto/request/change-password.dto';
 
 @UseInterceptors(LoggingInterceptor) // ✅ Apply logging interceptor
 @Controller('accounts')
@@ -57,7 +58,7 @@ export class AccountsController {
   @Get('total-created')
   async getTotalCreatedAccounts(
     @Query() searchQuery: { year: string; month: string },
-  ): Promise<ResponseDTO<any  >> {
+  ): Promise<ResponseDTO<any>> {
     const yearNum = parseInt(searchQuery.year, 10);
     const monthNum = parseInt(searchQuery.month, 10);
 
@@ -115,4 +116,12 @@ export class AccountsController {
     return ResponseDTO.success(result, `Account with ID ${id} deleted successfully`);
   }
 
+  @Put('change-password/:memberId')
+  async changePassword(
+    @Param('memberId') memberId: string,
+    @Body() dto: ChangePasswordDto
+  ): Promise<ResponseDTO<any>> {
+    const result = await this.accountsService.changePassword(memberId, dto);
+    return ResponseDTO.success(result, 'Đổi mật khẩu thành công');
+  }
 }

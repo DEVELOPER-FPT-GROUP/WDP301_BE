@@ -1,4 +1,4 @@
-import { ConflictException, forwardRef, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, forwardRef, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { IAccountService } from './accounts.service.interface';
 import { AccountsRepository } from '../repository/accounts.repository';
@@ -12,6 +12,7 @@ import { PaginationDTO } from 'src/utils/pagination.dto';
 import { Role } from '../../../utils/enum';
 import { TrackingsService } from 'src/modules/tracking/service/tracking.service';
 import { MembersRepository } from '../../members/repository/members.repository';
+import { ChangePasswordDto } from '../dto/request/change-password.dto';
 
 @Injectable()
 export class AccountsService implements IAccountService {
@@ -110,7 +111,7 @@ export class AccountsService implements IAccountService {
   async createAccount(dto: CreateAccountDto): Promise<AccountResponseDto> {
     // Ensure password is defined and a string
     if (!dto.passwordHash || typeof dto.passwordHash !== 'string') {
-        throw new Error('Password is required and must be a string.');
+      throw new Error('Password is required and must be a string.');
     }
 
     const hashedPassword = await bcrypt.hash(dto.passwordHash, 10);
@@ -119,10 +120,10 @@ export class AccountsService implements IAccountService {
     const uniqueUsername = await this.generateUniqueUsername(dto.username);
 
     // Create account with hashed password and unique username
-    const accountEntity = AccountMapper.toEntity({ 
-        ...dto, 
-        username: uniqueUsername, 
-        passwordHash: hashedPassword 
+    const accountEntity = AccountMapper.toEntity({
+      ...dto,
+      username: uniqueUsername,
+      passwordHash: hashedPassword
     });
 
     // Save account through repository
@@ -130,7 +131,7 @@ export class AccountsService implements IAccountService {
     await this.trackingsService.updateAccountStats();
 
     return AccountMapper.toResponseDto(savedAccount);
-}
+  }
 
 
   /**
@@ -222,4 +223,21 @@ export class AccountsService implements IAccountService {
     return (await this.accountsRepository.findAccountsByMonth(year, month)).length;
   }
 
+  async changePassword(memberId: string, dto: ChangePasswordDto): Promise<boolean> {
+    const account = await this.accountsRepository.findByMemberId(memberId);
+    if (!account) throw new NotFoundException('Không tìm thấy tài khoản');
+
+    const isMatch = await bcrypt.compare(dto.oldPassword, account.passwordHash);
+    if (!isMatch) throw new BadRequestException('Mật khẩu cũ không chính xác');
+
+    const isSamePassword = await bcrypt.compare(dto.newPassword, account.passwordHash);
+    if (isSamePassword) throw new BadRequestException('Mật khẩu mới không được trùng với mật khẩu cũ');
+
+    const hashedNewPassword = await bcrypt.hash(dto.newPassword, 10);
+    await this.accountsRepository.update(account._id.toString(), {
+      passwordHash: hashedNewPassword,
+    });
+
+    return true;
+  }
 }
