@@ -3,6 +3,7 @@ export class AccountResponseDto {
   memberId: string;
   username: string;
   email: string;
+  defaultPassword: string;
   isAdmin: boolean;
   createdAt: Date;
   updatedAt: Date;

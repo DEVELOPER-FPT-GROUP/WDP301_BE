@@ -5,10 +5,6 @@ import { Gender } from '../../../../utils/enum';
 export class SearchMemberDto {
   @IsOptional()
   @IsString()
-  search?: string;
-
-  @IsOptional()
-  @IsString()
   email?: string;
 
   @IsOptional()
@@ -23,6 +19,10 @@ export class SearchMemberDto {
   @IsOptional()
   @IsEnum(Gender)
   gender?: Gender;
+
+  @IsOptional()
+  @IsString()
+  fullName?: string;
 
   @IsOptional()
   @Type(() => Number)

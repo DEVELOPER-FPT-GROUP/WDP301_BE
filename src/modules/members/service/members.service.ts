@@ -899,11 +899,21 @@ export class MembersService implements IMembersService {
     const { page = 1, limit = 10 } = searchDto;
     const filters: any = {};
 
-    if (searchDto.search) {
+    // Search by full name (matches first, middle, last, or full string)
+    if (searchDto.fullName) {
+      const regex = new RegExp(searchDto.fullName.trim(), 'i');
       filters.$or = [
-        { firstName: new RegExp(searchDto.search, 'i') },
-        { middleName: new RegExp(searchDto.search, 'i') },
-        { lastName: new RegExp(searchDto.search, 'i') }
+        { firstName: regex },
+        { middleName: regex },
+        { lastName: regex },
+        {
+          $expr: {
+            $regexMatch: {
+              input: { $concat: ['$lastName', ' ', '$middleName', ' ', '$firstName'] },
+              regex: regex
+            }
+          }
+        }
       ];
     }
 
@@ -920,8 +930,9 @@ export class MembersService implements IMembersService {
     }
 
     filters.familyId = familyId;
+
     const { members, total } = await this.membersRepository.findByFilters(filters, page, limit);
-    const memberDTOs = members.map(member => MemberDTO.map(member));
+    const memberDTOs = members.map(MemberDTO.map);
 
     return PaginationDTO.create(memberDTOs, total, page, limit);
   }

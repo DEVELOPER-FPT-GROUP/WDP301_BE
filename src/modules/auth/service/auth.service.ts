@@ -65,6 +65,16 @@ export class AuthService implements IAuthService {
     const accessToken = await this.generateToken(account, '15m');
     const refreshToken = await this.generateToken(account, '7d');
 
+        if (!account) {
+            throw new NotFoundException('Your username or password is incorrect');
+        }
+
+        let password = account.password ? account.password : account.passwordHash;
+
+        if(!await bcrypt.compare(loginDto.password, password)) {
+            throw new NotFoundException('Your username or password is incorrect');
+        }
+    
     // Store refresh token in database
     await this.accountsRepository.updateRefreshToken(
       String(account._id),

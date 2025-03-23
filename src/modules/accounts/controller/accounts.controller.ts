@@ -21,7 +21,7 @@ export class AccountsController {
     private readonly familyService: FamiliesService
   ) { }
 
-  @Get('')
+  @Get("/search")
   async getAccountsWithPagination(
     @Query() searchDto: SearchAccountDto
   ): Promise<ResponseDTO<PaginationDTO<AccountResponseDto>>> {
