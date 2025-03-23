@@ -79,7 +79,7 @@ export class MembersService implements IMembersService {
       mediaList = files && files.length > 0 ? await this.mediaService.processAndUploadAvatar(files[0], String(createdMember._id), 'Member') : [];
     }
 
-    if(createdMember.isAlive) {
+    if (createdMember.isAlive) {
       const createAccountDto = Object.assign(new CreateAccountDto(), {
         memberId: String(createdMember._id),
         // Generates a unique username based on the child's name
@@ -745,11 +745,10 @@ export class MembersService implements IMembersService {
 
       // Fetch children for this member-spouse pair
       const childrenMap = await this.parentChildRelationshipsService.findChildrenByParentsId([memberId, spouseId]);
-      const spouseChildren = childrenMap.get(memberId)?.filter(child =>
-        {
-          console.log("child: ", child);
-          return  childrenMap.get(spouse.memberId)?.some(spouseChild => spouseChild.child?.memberId === child.child?.memberId)
-        }
+      const spouseChildren = childrenMap.get(memberId)?.filter(child => {
+        console.log("child: ", child);
+        return childrenMap.get(spouse.memberId)?.some(spouseChild => spouseChild.child?.memberId === child.child?.memberId)
+      }
       ) || [];
 
       spouseList.push({
@@ -895,13 +894,51 @@ export class MembersService implements IMembersService {
     return memberDTO;
   }
 
+  async searchMembersWithoutPagination(familyId: string, searchDto: SearchMemberDto): Promise<MemberDTO[]> {
+    const filters: any = {};
+
+    if (searchDto.search) {
+      const regex = new RegExp(searchDto.search.trim(), 'i');
+      filters.$or = [
+        { firstName: regex },
+        { middleName: regex },
+        { lastName: regex },
+        {
+          $expr: {
+            $regexMatch: {
+              input: { $concat: ['$lastName', ' ', '$middleName', ' ', '$firstName'] },
+              regex: regex
+            }
+          }
+        }
+      ];
+    }
+
+    if (searchDto.email) {
+      filters.email = new RegExp(searchDto.email, 'i');
+    }
+
+    if (searchDto.isAlive !== undefined) {
+      filters.isAlive = searchDto.isAlive;
+    }
+
+    if (searchDto.gender) {
+      filters.gender = searchDto.gender;
+    }
+
+    filters.familyId = familyId;
+
+    const members = await this.membersRepository.findWithoutPagination(filters);
+    return members.map(MemberDTO.map);
+  }
+
+
   async searchMembers(familyId: string, searchDto: SearchMemberDto): Promise<PaginationDTO<MemberDTO>> {
     const { page = 1, limit = 10 } = searchDto;
     const filters: any = {};
 
-    // Search by full name (matches first, middle, last, or full string)
-    if (searchDto.fullName) {
-      const regex = new RegExp(searchDto.fullName.trim(), 'i');
+    if (searchDto.search) {
+      const regex = new RegExp(searchDto.search.trim(), 'i');
       filters.$or = [
         { firstName: regex },
         { middleName: regex },

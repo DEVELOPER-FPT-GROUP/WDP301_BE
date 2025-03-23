@@ -35,7 +35,7 @@ import { winstonLogger as logger } from 'src/common/winston-logger';
 @Controller('members')
 @UseInterceptors(ClassSerializerInterceptor, LoggingInterceptor) // Enable auto-serialization
 export class MembersController {
-  constructor(private readonly membersService: MembersService,private readonly faceDetectionService: FaceDetectionService) {}
+  constructor(private readonly membersService: MembersService, private readonly faceDetectionService: FaceDetectionService) { }
 
   @Post()
   @UseInterceptors(FileFieldsInterceptor([{ name: 'files', maxCount: 10 }]))
@@ -58,7 +58,16 @@ export class MembersController {
     @Param('familyId') familyId: string,
     @Query() searchDto: SearchMemberDto): Promise<ResponseDTO<PaginationDTO<MemberDTO>>> {
     logger.http(`Received GET request to search members for Family ID: ${familyId}`);
-    const result = await this.membersService.searchMembers(familyId,searchDto);
+    const result = await this.membersService.searchMembers(familyId, searchDto);
+    return ResponseDTO.success(result, 'Members retrieved successfully');
+  }
+
+  @Get('family/:familyId/search/all')
+  async searchAllMembers(
+    @Param('familyId') familyId: string,
+    @Query() searchDto: SearchMemberDto): Promise<ResponseDTO<MemberDTO[]>> {
+    logger.http(`Received GET request to search members for Family ID: ${familyId}`);
+    const result = await this.membersService.searchMembersWithoutPagination(familyId, searchDto);
     return ResponseDTO.success(result, 'Members retrieved successfully');
   }
 
@@ -118,7 +127,7 @@ export class MembersController {
           fileIsRequired: false, // Files are optional
         })
     ) files: { files?: MulterFile[] }
-    ): Promise<ResponseDTO<MemberDTO | null>> {
+  ): Promise<ResponseDTO<MemberDTO | null>> {
     const result = await this.membersService.createSpouse(createSpouseDto, files?.files || []);
     return ResponseDTO.success(result, 'Spouse created successfully');
   }
@@ -150,7 +159,7 @@ export class MembersController {
           fileIsRequired: false, // Files are optional
         })
     ) files: { files?: MulterFile[] }
-    ): Promise<ResponseDTO<MemberDTO>> {
+  ): Promise<ResponseDTO<MemberDTO>> {
     const result = await this.membersService.createFamilyLeader(createMemberDto, files?.files || []);
     return ResponseDTO.success(result, 'Family leader created successfully');
   }
