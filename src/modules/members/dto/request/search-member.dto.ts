@@ -22,7 +22,7 @@ export class SearchMemberDto {
 
   @IsOptional()
   @IsString()
-  fullName?: string;
+  search?: string;
 
   @IsOptional()
   @Type(() => Number)

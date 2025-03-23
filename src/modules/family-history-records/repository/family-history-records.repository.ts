@@ -59,5 +59,16 @@ export class FamilyHistoryRecordRepository {
     return { records, total };
   }
 
+  async findByFamilyIdWithoutPagination(
+    filters: any,
+    sortOptions: any = {}
+  ): Promise<FamilyHistoryRecord[]> {
+    return this.recordModel
+      .find(filters)
+      .sort(sortOptions)
+      .select('-__v')
+      .lean()
+      .exec();
+  }
 
 }
