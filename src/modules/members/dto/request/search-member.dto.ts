@@ -1,4 +1,11 @@
-import { IsOptional, IsString, IsBoolean, IsEnum, IsNumber, Min } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsBoolean,
+  IsEnum,
+  IsNumber,
+  Min,
+} from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { Gender } from '../../../../utils/enum';
 
@@ -35,4 +42,9 @@ export class SearchMemberDto {
   @IsNumber()
   @Min(1)
   limit?: number = 10; // Default limit is 10
+
+  @IsOptional()
+  @Transform(({ value }) => value === 'true') // Chuyển đổi string 'true' thành boolean true
+  @IsBoolean()
+  isDeleted?: boolean;
 }

@@ -11,7 +11,7 @@ export class AccountMapper {
   static toEntity(dto: CreateAccountDto): Account {
     return {
       _id: new mongoose.Types.ObjectId(),
-      memberId: dto.memberId ? new mongoose.Types.ObjectId(dto.memberId): '', // ✅ Store as ObjectId
+      memberId: dto.memberId ? new mongoose.Types.ObjectId(dto.memberId) : '', // ✅ Store as ObjectId
       username: dto.username,
       passwordHash: dto.passwordHash,
       email: dto.email,
@@ -31,6 +31,8 @@ export class AccountMapper {
     if (dto.username) updateData.username = dto.username;
     if (dto.passwordHash) updateData.passwordHash = dto.passwordHash;
     if (dto.email) updateData.email = dto.email;
+    if (dto.memberId)
+      updateData.memberId = new mongoose.Types.ObjectId(dto.memberId);
     if (typeof dto.isAdmin !== 'undefined') updateData.isAdmin = dto.isAdmin;
 
     updateData.updatedAt = new Date();

@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { IMembersService } from './members.service.interface';
 import { CreateMemberDto } from '../dto/request/create-member.dto';
 import { MemberDTO } from '../dto/response/member.dto';
@@ -11,18 +16,12 @@ import { CreateMarriageDto } from '../../marriages/dto/request/create-marriage.d
 import { Gender, Role } from '../../../utils/enum';
 import { CreateSpouseDto } from '../dto/request/create-spouse.dto';
 import { CreateChildDto } from '../dto/request/create-child.dto';
-import {
-  ParentChildRelationshipsService,
-} from '../../parent-child-relationships/service/parent-child-relationships.service';
+import { ParentChildRelationshipsService } from '../../parent-child-relationships/service/parent-child-relationships.service';
 import { RelationshipTypesService } from '../../relationship-types/service/relationship-types.service';
-import {
-  CreateParentChildRelationshipDto,
-} from '../../parent-child-relationships/dto/request/create-parent-child-relationship.dto';
+import { CreateParentChildRelationshipDto } from '../../parent-child-relationships/dto/request/create-parent-child-relationship.dto';
 import { SpouseDTO } from '../dto/response/spouse.dto';
 import { ParentDTO } from '../dto/response/parent.dto';
-import {
-  ParentChildRelationshipDTO,
-} from '../../parent-child-relationships/dto/response/parent-child-relationship.dto';
+import { ParentChildRelationshipDTO } from '../../parent-child-relationships/dto/response/parent-child-relationship.dto';
 import { MarriageDTO } from '../../marriages/dto/response/marriage.dto';
 import { AccountsService } from '../../accounts/service/accounts.service';
 import { CreateAccountDto } from '../../accounts/dto/request/create-account.dto';
@@ -46,22 +45,28 @@ export class MembersService implements IMembersService {
     private readonly relationshipTypeService: RelationshipTypesService,
     private readonly accountsService: AccountsService,
     private readonly mediaService: MediaService,
-  ) {
-  }
+  ) {}
 
   /**
    * Creates a new member in the system.
    * @param createMemberDto - The data transfer object containing member details.
    * @returns The newly created member as a DTO.
    */
-  async createMember(createMemberDto: CreateMemberDto, files: MulterFile[]): Promise<MemberDTO> {
-    console.log('createMemberDto:', createMemberDto);
+  async createMember(
+    createMemberDto: CreateMemberDto,
+    files: MulterFile[],
+  ): Promise<MemberDTO> {
+    // console.log('createMemberDto:', createMemberDto);
     const createdMember = await this.membersRepository.create(createMemberDto);
 
-    console.log("files: ", files);
+    // console.log('files: ', files);
     let mediaList: MediaResponseDto[] = [];
     if (files && files.length > 0) {
-      mediaList = await this.mediaService.uploadMultipleFiles(files, String(createdMember._id), 'Member');
+      mediaList = await this.mediaService.uploadMultipleFiles(
+        files,
+        String(createdMember._id),
+        'Member',
+      );
     }
 
     const memberDTO = MemberDTO.map(createdMember);
@@ -69,23 +74,37 @@ export class MembersService implements IMembersService {
     return memberDTO;
   }
 
-  async createRootMember(createMemberDto: CreateMemberDto, files: MulterFile[]): Promise<MemberDTO> {
+  async createRootMember(
+    createMemberDto: CreateMemberDto,
+    files: MulterFile[],
+  ): Promise<MemberDTO> {
     console.log('createMemberDto:', createMemberDto);
     const createdMember = await this.membersRepository.create(createMemberDto);
 
-    console.log("files: ", files);
+    console.log('files: ', files);
     let mediaList: MediaResponseDto[] = [];
     if (files && files.length > 0) {
-      mediaList = files && files.length > 0 ? await this.mediaService.processAndUploadAvatar(files[0], String(createdMember._id), 'Member') : [];
+      mediaList =
+        files && files.length > 0
+          ? await this.mediaService.processAndUploadAvatar(
+              files[0],
+              String(createdMember._id),
+              'Member',
+            )
+          : [];
     }
 
     if (createdMember.isAlive) {
       const createAccountDto = Object.assign(new CreateAccountDto(), {
         memberId: String(createdMember._id),
         // Generates a unique username based on the child's name
-        username: DataUtils.generateUniqueUsername(createdMember.firstName, createdMember.middleName || '', createdMember.lastName),
+        username: DataUtils.generateUniqueUsername(
+          createdMember.firstName,
+          createdMember.middleName || '',
+          createdMember.lastName,
+        ),
         passwordHash: '123456', // Default password (should be securely managed)
-        role: Role.FAMILY_MEMBER
+        role: Role.FAMILY_MEMBER,
       });
       await this.accountsService.createAccount(createAccountDto);
     }
@@ -112,11 +131,11 @@ export class MembersService implements IMembersService {
 
     // Fetch media for this member
     const mediaList = await this.mediaService.getMediaByOwners([id], 'Member');
-    memberDTO.media = mediaList.map(media => {
+    memberDTO.media = mediaList.map((media) => {
       return {
         id: media.mediaId,
         url: media.url,
-      }
+      };
     }); // Store only URLs
 
     return memberDTO;
@@ -128,7 +147,7 @@ export class MembersService implements IMembersService {
    */
   async findAllMembers(): Promise<MemberDTO[]> {
     const members = await this.membersRepository.findAll();
-    return members.map(member => MemberDTO.map(member));
+    return members.map((member) => MemberDTO.map(member));
   }
 
   /**
@@ -138,7 +157,11 @@ export class MembersService implements IMembersService {
    * @param files - Optional list of media files to be uploaded.
    * @returns The updated member DTO with updated media.
    */
-  async updateMember(id: string, updateData: UpdateMemberDto, files?: MulterFile[]): Promise<MemberDTO> {
+  async updateMember(
+    id: string,
+    updateData: UpdateMemberDto,
+    files?: MulterFile[],
+  ): Promise<MemberDTO> {
     // Find the existing member
     const existingMember = await this.membersRepository.findById(id);
     if (!existingMember) {
@@ -149,27 +172,36 @@ export class MembersService implements IMembersService {
 
     // Handle media deletion if requested
     if (updateData.deleteImageIds && updateData.deleteImageIds.length > 0) {
-
       for (const imageId of updateData.deleteImageIds) {
         try {
           await this.mediaService.deleteMedia(imageId);
         } catch (error) {
-          throw new BadRequestException(`Failed to delete image: ${error.message}`);
+          throw new BadRequestException(
+            `Failed to delete image: ${error.message}`,
+          );
         }
       }
     }
 
     // Upload new files if needed
     if (updateData.isChangeImage && files && files.length > 0) {
-
       try {
-        mediaList = await this.mediaService.uploadMultipleFiles(files, String(existingMember._id), 'Member');
+        mediaList = await this.mediaService.uploadMultipleFiles(
+          files,
+          String(existingMember._id),
+          'Member',
+        );
       } catch (error) {
-        throw new BadRequestException(`Failed to upload new files: ${error.message}`);
+        throw new BadRequestException(
+          `Failed to upload new files: ${error.message}`,
+        );
       }
     } else {
       // If no new files, retrieve existing media
-      mediaList = await this.mediaService.getMediaByOwners([String(existingMember._id)], 'Member');
+      mediaList = await this.mediaService.getMediaByOwners(
+        [String(existingMember._id)],
+        'Member',
+      );
     }
 
     // Update the member details
@@ -180,7 +212,7 @@ export class MembersService implements IMembersService {
 
     // Convert updated member to DTO and attach media URLs
     const memberDTO = MemberDTO.map(updatedMember);
-    memberDTO.media = mediaList.map(media => media.url); // Return only media URLs
+    memberDTO.media = mediaList.map((media) => media.url); // Return only media URLs
 
     return memberDTO;
   }
@@ -240,24 +272,36 @@ export class MembersService implements IMembersService {
     if (!members.length) return null;
 
     const memberMap = new Map<string, any>();
-    const memberIds = members.map(m => String(m._id));
+    const memberIds = members.map((m) => String(m._id));
 
     const marriages = await this.marriagesService.getAllSpouses(memberIds);
-    const parentChildRelations = await this.parentChildRelationshipsService.findByChildIds(memberIds);
+    const parentChildRelations =
+      await this.parentChildRelationshipsService.findByChildIds(memberIds);
     const mediaMap = await this.getMediaMap(memberIds);
 
     // Create spouse map (handling multiple partners)
-    const spouseMap = new Map<string, {
-      id: string, name: string, gender: string, isSingle: boolean, isAlive: boolean,
-      dateOfBirth: string, dateOfDeath: string | null, deleted?: boolean, media: string[]
-    }[]>();
+    const spouseMap = new Map<
+      string,
+      {
+        id: string;
+        name: string;
+        gender: string;
+        isSingle: boolean;
+        isAlive: boolean;
+        dateOfBirth: string;
+        dateOfDeath: string | null;
+        deleted?: boolean;
+        media: string[];
+      }[]
+    >();
 
     marriages.forEach(({ husbandId, wifeId }) => {
-      const husband = members.find(m => String(m._id) === String(husbandId));
-      const wife = members.find(m => String(m._id) === String(wifeId));
+      const husband = members.find((m) => String(m._id) === String(husbandId));
+      const wife = members.find((m) => String(m._id) === String(wifeId));
 
       if (husband && wife) {
-        if (!spouseMap.has(String(husbandId))) spouseMap.set(String(husbandId), []);
+        if (!spouseMap.has(String(husbandId)))
+          spouseMap.set(String(husbandId), []);
         if (!spouseMap.has(String(wifeId))) spouseMap.set(String(wifeId), []);
 
         spouseMap.get(String(husbandId))!.push({
@@ -266,10 +310,14 @@ export class MembersService implements IMembersService {
           gender: wife.gender,
           isSingle: wife.isSingle,
           isAlive: wife.isAlive,
-          dateOfBirth: wife.dateOfBirth ? new Date(wife.dateOfBirth).toISOString() : '',
-          dateOfDeath: wife.dateOfDeath ? new Date(wife.dateOfDeath).toISOString() : '',
+          dateOfBirth: wife.dateOfBirth
+            ? new Date(wife.dateOfBirth).toISOString()
+            : '',
+          dateOfDeath: wife.dateOfDeath
+            ? new Date(wife.dateOfDeath).toISOString()
+            : '',
           deleted: wife.isDeleted,
-          media: mediaMap.get(String(wifeId))?.map(media => media.url) || []
+          media: mediaMap.get(String(wifeId))?.map((media) => media.url) || [],
         });
 
         spouseMap.get(String(wifeId))!.push({
@@ -278,10 +326,15 @@ export class MembersService implements IMembersService {
           gender: husband.gender,
           isSingle: husband.isSingle,
           isAlive: husband.isAlive,
-          dateOfBirth: husband.dateOfBirth ? new Date(husband.dateOfBirth).toISOString() : '',
-          dateOfDeath: husband.dateOfDeath ? new Date(husband.dateOfDeath).toISOString() : '',
+          dateOfBirth: husband.dateOfBirth
+            ? new Date(husband.dateOfBirth).toISOString()
+            : '',
+          dateOfDeath: husband.dateOfDeath
+            ? new Date(husband.dateOfDeath).toISOString()
+            : '',
           deleted: husband.isDeleted,
-          media: mediaMap.get(String(husbandId))?.map(media => media.url) || []
+          media:
+            mediaMap.get(String(husbandId))?.map((media) => media.url) || [],
         });
       }
     });
@@ -294,7 +347,7 @@ export class MembersService implements IMembersService {
     const birthOrderMap = new Map<string, number>();
 
     parentChildRelations.forEach(({ parentId, childId, birthOrder }) => {
-      const child = members.find(m => String(m._id) === String(childId));
+      const child = members.find((m) => String(m._id) === String(childId));
       if (child) {
         const parentKey = String(parentId);
         if (!childrenMap.has(parentKey)) {
@@ -308,9 +361,13 @@ export class MembersService implements IMembersService {
           gender: child.gender,
           isSingle: child.isSingle,
           isAlive: child.isAlive,
-          dateOfBirth: child.dateOfBirth ? new Date(child.dateOfBirth).toISOString() : '',
-          dateOfDeath: child.dateOfDeath ? new Date(child.dateOfDeath).toISOString() : '',
-          media: mediaMap.get(String(childId))?.map(media => media.url) || []
+          dateOfBirth: child.dateOfBirth
+            ? new Date(child.dateOfBirth).toISOString()
+            : '',
+          dateOfDeath: child.dateOfDeath
+            ? new Date(child.dateOfDeath).toISOString()
+            : '',
+          media: mediaMap.get(String(childId))?.map((media) => media.url) || [],
         };
 
         // Only add birthOrder if the child has an ID
@@ -339,7 +396,7 @@ export class MembersService implements IMembersService {
     });
 
     // Create member data structure
-    members.forEach(member => {
+    members.forEach((member) => {
       if (member.isDeleted) return;
 
       const memberData = {
@@ -348,40 +405,70 @@ export class MembersService implements IMembersService {
         gender: member.gender,
         isSingle: member.isSingle,
         isAlive: member.isAlive,
-        dateOfBirth: member.dateOfBirth ? new Date(member.dateOfBirth).toISOString() : '',
-        dateOfDeath: member.dateOfDeath ? new Date(member.dateOfDeath).toISOString() : '',
+        dateOfBirth: member.dateOfBirth
+          ? new Date(member.dateOfBirth).toISOString()
+          : '',
+        dateOfDeath: member.dateOfDeath
+          ? new Date(member.dateOfDeath).toISOString()
+          : '',
         generation: member.generation,
-        media: mediaMap.get(String(member._id))?.map(media => media.url) || [],
+        media:
+          mediaMap.get(String(member._id))?.map((media) => media.url) || [],
         relationships: [] as Array<{
-          partner?: { id: string, name: string, gender: string, isSingle: boolean, isAlive: boolean, dateOfBirth: string, dateOfDeath: string | null, media: string[] };
+          partner?: {
+            id: string;
+            name: string;
+            gender: string;
+            isSingle: boolean;
+            isAlive: boolean;
+            dateOfBirth: string;
+            dateOfDeath: string | null;
+            media: string[];
+          };
           isMarried?: boolean;
-          children?: { id: string, name: string, generation: number, gender: string, isSingle: boolean, isAlive: boolean, dateOfBirth: string, dateOfDeath: string | null, birthOrder?: number, media: string[] }[];
-        }>
+          children?: {
+            id: string;
+            name: string;
+            generation: number;
+            gender: string;
+            isSingle: boolean;
+            isAlive: boolean;
+            dateOfBirth: string;
+            dateOfDeath: string | null;
+            birthOrder?: number;
+            media: string[];
+          }[];
+        }>,
       };
 
       let hasVisiblePartner = false;
       if (spouseMap.has(memberData.id)) {
-        spouseMap.get(memberData.id)!.forEach(spouse => {
-          let sharedChildren = (childrenMap.get(memberData.id) || []).filter(child =>
-            childParentMap.has(child.id) &&
-            childParentMap.get(child.id)!.includes(spouse.id)
+        spouseMap.get(memberData.id)!.forEach((spouse) => {
+          let sharedChildren = (childrenMap.get(memberData.id) || []).filter(
+            (child) =>
+              childParentMap.has(child.id) &&
+              childParentMap.get(child.id)!.includes(spouse.id),
           );
 
           // Only include birthOrder if the child has an ID
-          sharedChildren = sharedChildren.map(child => child.id ? { ...child, birthOrder: birthOrderMap.get(child.id) ?? 0 } : child);
+          sharedChildren = sharedChildren.map((child) =>
+            child.id
+              ? { ...child, birthOrder: birthOrderMap.get(child.id) ?? 0 }
+              : child,
+          );
 
           // Remove empty child objects
-          sharedChildren = sharedChildren.filter(child => child.id);
+          sharedChildren = sharedChildren.filter((child) => child.id);
 
           if (!spouse.deleted) {
             hasVisiblePartner = true;
             memberData.relationships.push({
               partner: {
                 ...spouse,
-                media: spouse.media || []
+                media: spouse.media || [],
               },
               isMarried: true,
-              children: sharedChildren.length ? sharedChildren : undefined
+              children: sharedChildren.length ? sharedChildren : undefined,
             });
           } else if (sharedChildren.length > 0) {
             memberData.relationships.push({ children: sharedChildren });
@@ -390,13 +477,13 @@ export class MembersService implements IMembersService {
       }
 
       if (!hasVisiblePartner) {
-        memberData.relationships.forEach(rel => delete rel.isMarried);
+        memberData.relationships.forEach((rel) => delete rel.isMarried);
       }
 
       memberMap.set(memberData.id, memberData);
     });
 
-    const rootMember = members.find(m => m.generation === 0 && !m.isDeleted);
+    const rootMember = members.find((m) => m.generation === 0 && !m.isDeleted);
     if (!rootMember) return null;
 
     const visited = new Set<string>();
@@ -408,18 +495,27 @@ export class MembersService implements IMembersService {
       const memberData = memberMap.get(memberId);
       if (!memberData) return null;
 
-      memberData.relationships = memberData.relationships.map(rel => {
-        if (rel.partner) {
-          rel.partner.media = rel.partner.media || [];
-        }
-        if (rel.children) {
-          rel.children = rel.children
-            .map(child => (child.id ? { ...constructHierarchy(child.id), birthOrder: birthOrderMap.get(child.id) ?? 0 } : child))
-            .sort((a, b) => (a.birthOrder ?? 0) - (b.birthOrder ?? 0))
-            .filter(child => child.id);
-        }
-        return rel;
-      }).filter(Boolean);
+      memberData.relationships = memberData.relationships
+        .map((rel) => {
+          if (rel.partner) {
+            rel.partner.media = rel.partner.media || [];
+          }
+          if (rel.children) {
+            rel.children = rel.children
+              .map((child) =>
+                child.id
+                  ? {
+                      ...constructHierarchy(child.id),
+                      birthOrder: birthOrderMap.get(child.id) ?? 0,
+                    }
+                  : child,
+              )
+              .sort((a, b) => (a.birthOrder ?? 0) - (b.birthOrder ?? 0))
+              .filter((child) => child.id);
+          }
+          return rel;
+        })
+        .filter(Boolean);
 
       return memberData;
     }
@@ -430,11 +526,16 @@ export class MembersService implements IMembersService {
   /**
    * Retrieves media for a list of member IDs.
    */
-  private async getMediaMap(memberIds: string[]): Promise<Map<string, MediaResponseDto[]>> {
-    const mediaList = await this.mediaService.getMediaByOwners(memberIds, 'Member');
+  private async getMediaMap(
+    memberIds: string[],
+  ): Promise<Map<string, MediaResponseDto[]>> {
+    const mediaList = await this.mediaService.getMediaByOwners(
+      memberIds,
+      'Member',
+    );
     const mediaMap = new Map<string, MediaResponseDto[]>();
 
-    mediaList.forEach(media => {
+    mediaList.forEach((media) => {
       if (!mediaMap.has(media.ownerId)) {
         mediaMap.set(media.ownerId, []);
       }
@@ -449,12 +550,18 @@ export class MembersService implements IMembersService {
    * @param createSpouseDto - The DTO containing spouse details.
    * @returns The newly created spouse as a MemberDTO, or null if the member does not exist.
    */
-  async createSpouse(createSpouseDto: CreateSpouseDto, files?: MulterFile[]): Promise<MemberDTO | null> {
+  async createSpouse(
+    createSpouseDto: CreateSpouseDto,
+    files?: MulterFile[],
+  ): Promise<MemberDTO | null> {
     const member = await this.getMemberById(createSpouseDto.memberId);
     if (!member) throw new NotFoundException('Member not found');
 
     // Create a MemberDto object for the spouse
-    const createMemberDto = this.buildCreateSpouseMemberDto(member, createSpouseDto);
+    const createMemberDto = this.buildCreateSpouseMemberDto(
+      member,
+      createSpouseDto,
+    );
     const spouse = await this.createMember(createMemberDto, files || []);
     if (!spouse) return null;
 
@@ -476,7 +583,10 @@ export class MembersService implements IMembersService {
    * @param createSpouseDto - The DTO containing spouse details.
    * @returns A CreateMemberDto for the new spouse.
    */
-  private buildCreateSpouseMemberDto(member: MemberDTO, createSpouseDto: CreateSpouseDto): CreateMemberDto {
+  private buildCreateSpouseMemberDto(
+    member: MemberDTO,
+    createSpouseDto: CreateSpouseDto,
+  ): CreateMemberDto {
     return Object.assign(new CreateMemberDto(), {
       familyId: member.familyId,
       firstName: createSpouseDto.firstName,
@@ -489,7 +599,7 @@ export class MembersService implements IMembersService {
       isAlive: createSpouseDto.isAlive,
       generation: member.generation,
       shortSummary: createSpouseDto.shortSummary,
-      gender: member.gender === Gender.MALE ? Gender.FEMALE : Gender.MALE
+      gender: member.gender === Gender.MALE ? Gender.FEMALE : Gender.MALE,
     });
   }
 
@@ -499,10 +609,15 @@ export class MembersService implements IMembersService {
    * @param spouse - The newly created spouse.
    * @returns A CreateMarriageDto representing the marriage.
    */
-  private buildCreateMarriageDto(member: MemberDTO, spouse: MemberDTO): CreateMarriageDto {
+  private buildCreateMarriageDto(
+    member: MemberDTO,
+    spouse: MemberDTO,
+  ): CreateMarriageDto {
     return Object.assign(new CreateMarriageDto(), {
-      husbandId: member.gender === Gender.MALE ? member.memberId : spouse.memberId,
-      wifeId: member.gender === Gender.FEMALE ? member.memberId : spouse.memberId
+      husbandId:
+        member.gender === Gender.MALE ? member.memberId : spouse.memberId,
+      wifeId:
+        member.gender === Gender.FEMALE ? member.memberId : spouse.memberId,
     });
   }
 
@@ -519,7 +634,7 @@ export class MembersService implements IMembersService {
         spouse.lastName,
       ),
       passwordHash: '123456',
-      role: Role.FAMILY_MEMBER
+      role: Role.FAMILY_MEMBER,
     });
 
     await this.accountsService.createAccount(createAccountDto);
@@ -530,11 +645,16 @@ export class MembersService implements IMembersService {
    * @param createChildDto - The DTO containing child details.
    * @returns The newly created child as a MemberDTO, or null if the member or spouse does not exist.
    */
-  async createChild(createChildDto: CreateChildDto, files?: MulterFile[]): Promise<MemberDTO | null> {
+  async createChild(
+    createChildDto: CreateChildDto,
+    files?: MulterFile[],
+  ): Promise<MemberDTO | null> {
     const { parentId, parentSpouseId, birthOrder } = createChildDto;
 
     if (parentId === parentSpouseId) {
-      throw new NotFoundException('Parent and spouse cannot be the same person');
+      throw new NotFoundException(
+        'Parent and spouse cannot be the same person',
+      );
     }
 
     const parent = await this.getMemberById(parentId);
@@ -545,10 +665,14 @@ export class MembersService implements IMembersService {
     let parentSpouse: MemberDTO | null = null;
 
     if (parentSpouseId) {
-      const parentSpouses = await this.marriagesService.getAllSpouses([parent.memberId]);
+      const parentSpouses = await this.marriagesService.getAllSpouses([
+        parent.memberId,
+      ]);
 
       const isValidSpouse = parentSpouses.some(
-        (spouse) => spouse.husbandId === parentSpouseId || spouse.wifeId === parentSpouseId
+        (spouse) =>
+          spouse.husbandId === parentSpouseId ||
+          spouse.wifeId === parentSpouseId,
       );
 
       if (!isValidSpouse) {
@@ -562,13 +686,21 @@ export class MembersService implements IMembersService {
     }
 
     // Create new child with uploaded files
-    const createMemberDto = this.buildCreateChildMemberDto(parent, createChildDto);
+    const createMemberDto = this.buildCreateChildMemberDto(
+      parent,
+      createChildDto,
+    );
     const child = await this.createMember(createMemberDto, files || []);
     if (!child) return null;
 
     // Store parent-child relationships with the provided birthOrder
     if (parentSpouse) {
-      await this.createParentChildRelationships(parent, parentSpouse, child, birthOrder);
+      await this.createParentChildRelationships(
+        parent,
+        parentSpouse,
+        child,
+        birthOrder,
+      );
     } else {
       await this.createSingleParentChildRelationship(parent, child, birthOrder);
     }
@@ -580,8 +712,10 @@ export class MembersService implements IMembersService {
     return child;
   }
 
-
-  private buildCreateChildMemberDto(parent: MemberDTO, createChildDto: CreateChildDto): CreateMemberDto {
+  private buildCreateChildMemberDto(
+    parent: MemberDTO,
+    createChildDto: CreateChildDto,
+  ): CreateMemberDto {
     return Object.assign(new CreateMemberDto(), {
       familyId: parent.familyId,
       firstName: createChildDto.firstName,
@@ -594,7 +728,7 @@ export class MembersService implements IMembersService {
       isAlive: createChildDto.isAlive,
       generation: parent.generation + 1, // Increase generation level
       shortSummary: createChildDto.shortSummary,
-      gender: createChildDto.gender
+      gender: createChildDto.gender,
     });
   }
 
@@ -610,15 +744,21 @@ export class MembersService implements IMembersService {
     parent: MemberDTO,
     parentSpouse: MemberDTO,
     child: MemberDTO,
-    birthOrder: number
+    birthOrder: number,
   ): Promise<void> {
-    const parentRelationType = await this.relationshipTypeService.getRelationshipTypeByName(
-      parent.gender === Gender.MALE ? RELATIONSHIP_TYPES.FATHER : RELATIONSHIP_TYPES.MOTHER
-    );
+    const parentRelationType =
+      await this.relationshipTypeService.getRelationshipTypeByName(
+        parent.gender === Gender.MALE
+          ? RELATIONSHIP_TYPES.FATHER
+          : RELATIONSHIP_TYPES.MOTHER,
+      );
 
-    const spouseRelationType = await this.relationshipTypeService.getRelationshipTypeByName(
-      parentSpouse.gender === Gender.MALE ? RELATIONSHIP_TYPES.FATHER : RELATIONSHIP_TYPES.MOTHER
-    );
+    const spouseRelationType =
+      await this.relationshipTypeService.getRelationshipTypeByName(
+        parentSpouse.gender === Gender.MALE
+          ? RELATIONSHIP_TYPES.FATHER
+          : RELATIONSHIP_TYPES.MOTHER,
+      );
 
     if (!parentRelationType || !spouseRelationType) return;
 
@@ -626,18 +766,22 @@ export class MembersService implements IMembersService {
       parent.memberId,
       child.memberId,
       parentRelationType.relaTypeId,
-      birthOrder
+      birthOrder,
     );
 
     const spouseRelationship = this.buildParentChildRelationship(
       parentSpouse.memberId,
       child.memberId,
       spouseRelationType.relaTypeId,
-      birthOrder
+      birthOrder,
     );
 
-    await this.parentChildRelationshipsService.createRelationship(parentRelationship);
-    await this.parentChildRelationshipsService.createRelationship(spouseRelationship);
+    await this.parentChildRelationshipsService.createRelationship(
+      parentRelationship,
+    );
+    await this.parentChildRelationshipsService.createRelationship(
+      spouseRelationship,
+    );
   }
 
   /**
@@ -653,13 +797,13 @@ export class MembersService implements IMembersService {
     parentId: string,
     childId: string,
     relaTypeId: string,
-    birthOrder: number
+    birthOrder: number,
   ): CreateParentChildRelationshipDto {
     return Object.assign(new CreateParentChildRelationshipDto(), {
       parentId,
       childId,
       relaTypeId,
-      birthOrder
+      birthOrder,
     });
   }
 
@@ -673,11 +817,14 @@ export class MembersService implements IMembersService {
   private async createSingleParentChildRelationship(
     parent: MemberDTO,
     child: MemberDTO,
-    birthOrder: number
+    birthOrder: number,
   ): Promise<void> {
-    const parentRelationType = await this.relationshipTypeService.getRelationshipTypeByName(
-      parent.gender === Gender.MALE ? RELATIONSHIP_TYPES.FATHER : RELATIONSHIP_TYPES.MOTHER
-    );
+    const parentRelationType =
+      await this.relationshipTypeService.getRelationshipTypeByName(
+        parent.gender === Gender.MALE
+          ? RELATIONSHIP_TYPES.FATHER
+          : RELATIONSHIP_TYPES.MOTHER,
+      );
 
     if (!parentRelationType) return;
 
@@ -685,10 +832,12 @@ export class MembersService implements IMembersService {
       parent.memberId,
       child.memberId,
       parentRelationType.relaTypeId,
-      birthOrder
+      birthOrder,
     );
 
-    await this.parentChildRelationshipsService.createRelationship(parentRelationship);
+    await this.parentChildRelationshipsService.createRelationship(
+      parentRelationship,
+    );
   }
 
   /**
@@ -700,19 +849,26 @@ export class MembersService implements IMembersService {
     const createAccountDto = Object.assign(new CreateAccountDto(), {
       memberId: child.memberId,
       // Generates a unique username based on the child's name
-      username: DataUtils.generateUniqueUsername(child.firstName, child.middleName || '', child.lastName),
+      username: DataUtils.generateUniqueUsername(
+        child.firstName,
+        child.middleName || '',
+        child.lastName,
+      ),
       passwordHash: '123456', // Default password (should be securely managed)
-      role: Role.FAMILY_MEMBER
+      role: Role.FAMILY_MEMBER,
     });
 
     // Calls the account service to create the account
     await this.accountsService.createAccount(createAccountDto);
   }
 
-  private async createSpouseMap(marriages: MarriageDTO[], memberId: string): Promise<Map<string, any>> {
+  private async createSpouseMap(
+    marriages: MarriageDTO[],
+    memberId: string,
+  ): Promise<Map<string, any>> {
     const spouseMap = new Map<string, any>();
 
-    console.log("marriages: ", marriages);
+    console.log('marriages: ', marriages);
     const listMapParents = new Map<string, string[]>();
 
     // Create a map of (memberId <-> spouseId) pairs (handling multiple spouses)
@@ -726,7 +882,7 @@ export class MembersService implements IMembersService {
       }
     });
 
-    console.log("listMapParents:", listMapParents);
+    console.log('listMapParents:', listMapParents);
 
     // Get spouse IDs
     const spouseIds = listMapParents.get(memberId);
@@ -744,16 +900,25 @@ export class MembersService implements IMembersService {
       if (!spouse) continue; // Skip if spouse not found
 
       // Fetch children for this member-spouse pair
-      const childrenMap = await this.parentChildRelationshipsService.findChildrenByParentsId([memberId, spouseId]);
-      const spouseChildren = childrenMap.get(memberId)?.filter(child => {
-        console.log("child: ", child);
-        return childrenMap.get(spouse.memberId)?.some(spouseChild => spouseChild.child?.memberId === child.child?.memberId)
-      }
-      ) || [];
+      const childrenMap =
+        await this.parentChildRelationshipsService.findChildrenByParentsId([
+          memberId,
+          spouseId,
+        ]);
+      const spouseChildren =
+        childrenMap.get(memberId)?.filter((child) => {
+          console.log('child: ', child);
+          return childrenMap
+            .get(spouse.memberId)
+            ?.some(
+              (spouseChild) =>
+                spouseChild.child?.memberId === child.child?.memberId,
+            );
+        }) || [];
 
       spouseList.push({
         spouse: spouse,
-        children: spouseChildren
+        children: spouseChildren,
       });
     }
 
@@ -769,10 +934,12 @@ export class MembersService implements IMembersService {
    * @param parentRelations - An array of parent-child relationships.
    * @returns A Map where keys are parent IDs and values are arrays of child IDs.
    */
-  private createChildrenMap(parentRelations: ParentChildRelationshipDTO[]): Map<string, string[]> {
+  private createChildrenMap(
+    parentRelations: ParentChildRelationshipDTO[],
+  ): Map<string, string[]> {
     const childrenMap = new Map<string, string[]>();
 
-    parentRelations.forEach(relation => {
+    parentRelations.forEach((relation) => {
       // If the parent is not yet in the map, initialize an empty array for their children
       if (!childrenMap.has(relation.parentId)) {
         childrenMap.set(relation.parentId, []);
@@ -790,7 +957,9 @@ export class MembersService implements IMembersService {
    * @param childRelations - An array of child-parent relationships.
    * @returns A Map where keys are child IDs and values are ParentDTO objects containing parent details.
    */
-  private async createParentMap(childRelations: ParentChildRelationshipDTO[]): Promise<Map<string, ParentDTO>> {
+  private async createParentMap(
+    childRelations: ParentChildRelationshipDTO[],
+  ): Promise<Map<string, ParentDTO>> {
     const parentMap = new Map<string, ParentDTO>();
 
     for (const relation of childRelations) {
@@ -823,7 +992,9 @@ export class MembersService implements IMembersService {
 
       // Xác định cha/mẹ dựa trên spouse data
       const spouseData = await this.membersRepository.findById(
-        spouse.husbandId === relation.parentId ? spouse.wifeId : spouse.husbandId
+        spouse.husbandId === relation.parentId
+          ? spouse.wifeId
+          : spouse.husbandId,
       );
 
       if (spouseData) {
@@ -848,14 +1019,15 @@ export class MembersService implements IMembersService {
     return parentMap;
   }
 
-  async createFamilyLeader(createMemberDto: CreateMemberDto, files?: MulterFile[]): Promise<MemberDTO> {
-    console.log('Creating Family Leader:', createMemberDto);
-
+  async createFamilyLeader(
+    createMemberDto: CreateMemberDto,
+    files?: MulterFile[],
+  ): Promise<MemberDTO> {
     const createdMember = await this.createMember(createMemberDto, files || []);
     if (!createdMember) {
       throw new Error('Failed to create family leader');
     }
-
+    console.log('From Service:', createdMember);
     return createdMember;
   }
 
@@ -885,7 +1057,8 @@ export class MembersService implements IMembersService {
     memberDTO.spouses = spouseMap.get(memberDTO.memberId) || [];
 
     // Lấy quan hệ cha mẹ - con cái
-    const childRelations = await this.parentChildRelationshipsService.findByChildIds(memberIds);
+    const childRelations =
+      await this.parentChildRelationshipsService.findByChildIds(memberIds);
 
     // Tạo map lookup cho parent
     const parentMap = await this.createParentMap(childRelations);
@@ -894,7 +1067,10 @@ export class MembersService implements IMembersService {
     return memberDTO;
   }
 
-  async searchMembersWithoutPagination(familyId: string, searchDto: SearchMemberDto): Promise<MemberDTO[]> {
+  async searchMembersWithoutPagination(
+    familyId: string,
+    searchDto: SearchMemberDto,
+  ): Promise<MemberDTO[]> {
     const filters: any = {};
 
     if (searchDto.search) {
@@ -906,11 +1082,13 @@ export class MembersService implements IMembersService {
         {
           $expr: {
             $regexMatch: {
-              input: { $concat: ['$lastName', ' ', '$middleName', ' ', '$firstName'] },
-              regex: regex
-            }
-          }
-        }
+              input: {
+                $concat: ['$lastName', ' ', '$middleName', ' ', '$firstName'],
+              },
+              regex: regex,
+            },
+          },
+        },
       ];
     }
 
@@ -932,28 +1110,35 @@ export class MembersService implements IMembersService {
     return members.map(MemberDTO.map);
   }
 
-
-  async searchMembers(familyId: string, searchDto: SearchMemberDto): Promise<PaginationDTO<MemberDTO>> {
+  async searchMembers(
+    familyId: string,
+    searchDto: SearchMemberDto,
+  ): Promise<PaginationDTO<MemberDTO>> {
     const { page = 1, limit = 10 } = searchDto;
     const filters: any = {};
 
     if (searchDto.search) {
-      const regex = new RegExp(searchDto.search.trim(), 'i');
-      filters.$or = [
-        { firstName: regex },
-        { middleName: regex },
-        { lastName: regex },
-        {
-          $expr: {
-            $regexMatch: {
-              input: { $concat: ['$lastName', ' ', '$middleName', ' ', '$firstName'] },
-              regex: regex
-            }
-          }
-        }
-      ];
+      // Tách từ khóa tìm kiếm thành các từ riêng biệt
+      const searchTerms = searchDto.search.trim().split(/\s+/);
+
+      // Tạo danh sách điều kiện tìm kiếm cho từng từ
+      const termFilters = searchTerms.map((term) => {
+        const wordRegex = new RegExp(term, 'i');
+        return {
+          $or: [
+            { firstName: wordRegex },
+            { middleName: wordRegex },
+            { lastName: wordRegex },
+            { fullName: wordRegex }, // Nếu có trường fullName
+          ],
+        };
+      });
+
+      // Kết hợp các điều kiện với $and - TẤT CẢ các từ phải được tìm thấy
+      filters.$and = termFilters;
     }
 
+    // Phần còn lại của code
     if (searchDto.email) {
       filters.email = new RegExp(searchDto.email, 'i');
     }
@@ -966,9 +1151,21 @@ export class MembersService implements IMembersService {
       filters.gender = searchDto.gender;
     }
 
+    // Handle isDeleted filter
+    if (searchDto.isDeleted !== undefined) {
+      filters.isDeleted = searchDto.isDeleted;
+    } else {
+      // By default, only show non-deleted members
+      filters.isDeleted = false;
+    }
+
     filters.familyId = familyId;
 
-    const { members, total } = await this.membersRepository.findByFilters(filters, page, limit);
+    const { members, total } = await this.membersRepository.findByFilters(
+      filters,
+      page,
+      limit,
+    );
     const memberDTOs = members.map(MemberDTO.map);
 
     return PaginationDTO.create(memberDTOs, total, page, limit);
@@ -989,5 +1186,4 @@ export class MembersService implements IMembersService {
 
     return MemberDTO.map(result);
   }
-
 }

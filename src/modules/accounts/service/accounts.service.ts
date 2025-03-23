@@ -1,4 +1,11 @@
-import { BadRequestException, ConflictException, forwardRef, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  forwardRef,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { IAccountService } from './accounts.service.interface';
 import { AccountsRepository } from '../repository/accounts.repository';
@@ -34,11 +41,11 @@ export class AccountsService implements IAccountService {
     if (!existingAdmin) {
       const adminAccountDto: CreateAccountDto = {
         username: 'admin',
-        passwordHash: "admin",
+        passwordHash: 'admin',
         email: 'admin@example.com', // Optional
         isAdmin: true,
         role: Role.SYSTEM_ADMIN,
-        memberId: "",
+        memberId: '',
       };
 
       try {
@@ -49,7 +56,9 @@ export class AccountsService implements IAccountService {
     }
   }
 
-  async getAccountsWithPagination(searchDto: SearchAccountDto): Promise<PaginationDTO<AccountResponseDto>> {
+  async getAccountsWithPagination(
+    searchDto: SearchAccountDto,
+  ): Promise<PaginationDTO<AccountResponseDto>> {
     const { page = 1, limit = 10, search, isAdmin, familyId } = searchDto;
 
     const filters: any = {};
@@ -65,8 +74,9 @@ export class AccountsService implements IAccountService {
 
     // 🔍 Tìm theo familyId thông qua liên kết với Member
     if (familyId) {
-      const members = await this.membersRepository.findMembersInFamily(familyId);
-      const memberIds = members.map(m => m._id); // ✅ Lấy ra danh sách _id
+      const members =
+        await this.membersRepository.findMembersInFamily(familyId);
+      const memberIds = members.map((m) => m._id); // ✅ Lấy ra danh sách _id
 
       if (memberIds.length === 0) {
         return PaginationDTO.create([], 0, page, limit); // không có member nào thuộc family
@@ -74,7 +84,11 @@ export class AccountsService implements IAccountService {
       filters.memberId = { $in: memberIds };
     }
 
-    const { records, total } = await this.accountsRepository.findAndCount(filters, page, limit);
+    const { records, total } = await this.accountsRepository.findAndCount(
+      filters,
+      page,
+      limit,
+    );
 
     if (records.length === 0) return PaginationDTO.create([], 0, page, limit);
 
@@ -82,10 +96,9 @@ export class AccountsService implements IAccountService {
       records.map((account) => AccountMapper.toResponseDto(account)),
       total,
       page,
-      limit
+      limit,
     );
   }
-
 
   /**
    * Creates a new account, ensuring a unique username if already exists.
@@ -123,7 +136,7 @@ export class AccountsService implements IAccountService {
     const accountEntity = AccountMapper.toEntity({
       ...dto,
       username: uniqueUsername,
-      passwordHash: hashedPassword
+      passwordHash: hashedPassword,
     });
 
     // Save account through repository
@@ -132,7 +145,6 @@ export class AccountsService implements IAccountService {
 
     return AccountMapper.toResponseDto(savedAccount);
   }
-
 
   /**
    * Generates a unique username by appending an incrementing index if necessary.
@@ -158,11 +170,24 @@ export class AccountsService implements IAccountService {
 
   async getAccountById(id: string): Promise<AccountResponseDto> {
     const account = await this.accountsRepository.findById(id);
-    if (!account) throw new NotFoundException(`Account with ID ${id} not found`);
+    if (!account)
+      throw new NotFoundException(`Account with ID ${id} not found`);
+    return AccountMapper.toResponseDto(account);
+  }
+  async getAccountByUsername(username: string): Promise<AccountResponseDto> {
+    // console.log('check username', username);
+    const account = await this.accountsRepository.findByUsername(username);
+    if (!account)
+      throw new NotFoundException(
+        `Account with Username ${username} not found`,
+      );
+    console.log('Account:', AccountMapper.toResponseDto(account));
     return AccountMapper.toResponseDto(account);
   }
 
-  async getAccountByMemberId(memberId: string): Promise<AccountResponseDto | null> {
+  async getAccountByMemberId(
+    memberId: string,
+  ): Promise<AccountResponseDto | null> {
     const account = await this.accountsRepository.findByMemberId(memberId);
     return account ? AccountMapper.toResponseDto(account) : null;
   }
@@ -173,9 +198,13 @@ export class AccountsService implements IAccountService {
    * @param dto - The update account DTO.
    * @returns The updated account response DTO.
    */
-  async updateAccount(id: string, dto: UpdateAccountDto): Promise<AccountResponseDto> {
+  async updateAccount(
+    id: string,
+    dto: UpdateAccountDto,
+  ): Promise<AccountResponseDto> {
     const existingAccount = await this.accountsRepository.findById(id);
-    if (!existingAccount) throw new NotFoundException(`Account with ID ${id} not found`);
+    if (!existingAccount)
+      throw new NotFoundException(`Account with ID ${id} not found`);
 
     // If username is being updated, ensure uniqueness
     let newUsername = dto.username || existingAccount.username;
@@ -192,46 +221,67 @@ export class AccountsService implements IAccountService {
     dto.username = newUsername;
     dto.passwordHash = updatedPasswordHash;
 
-    // Update the account
-    const updatedAccount = await this.accountsRepository.update(id, AccountMapper.toUpdateEntity(dto));
+    console.log('check dto', dto);
 
-    if (!updatedAccount) throw new NotFoundException(`Account with ID ${id} not found`);
+    // Update the account
+    const updatedAccount = await this.accountsRepository.update(
+      id,
+      AccountMapper.toUpdateEntity(dto),
+    );
+
+    if (!updatedAccount)
+      throw new NotFoundException(`Account with ID ${id} not found`);
     return AccountMapper.toResponseDto(updatedAccount);
   }
 
   async deleteAccount(id: string): Promise<AccountResponseDto> {
     const deletedAccount = await this.accountsRepository.delete(id);
-    if (!deletedAccount) throw new NotFoundException(`Account with ID ${id} not found`);
+    if (!deletedAccount)
+      throw new NotFoundException(`Account with ID ${id} not found`);
     return AccountMapper.toResponseDto(deletedAccount);
   }
 
-  async createFamilyLeaderAccount(createAccountDto: CreateAccountDto): Promise<AccountResponseDto> {
+  async createFamilyLeaderAccount(
+    createAccountDto: CreateAccountDto,
+  ): Promise<AccountResponseDto> {
     if (!createAccountDto.username) {
       throw new NotFoundException('Username is required');
     }
 
-    const isExistAccount = await this.accountsRepository.existsByUsername(createAccountDto.username);
+    const isExistAccount = await this.accountsRepository.existsByUsername(
+      createAccountDto.username,
+    );
 
     if (isExistAccount) {
       throw new ConflictException('Username already exists');
     }
 
-    return await this.createAccount(createAccountDto)
+    return await this.createAccount(createAccountDto);
   }
 
   async getTotalAccountsCreated(year: number, month: number): Promise<number> {
-    return (await this.accountsRepository.findAccountsByMonth(year, month)).length;
+    return (await this.accountsRepository.findAccountsByMonth(year, month))
+      .length;
   }
 
-  async changePassword(memberId: string, dto: ChangePasswordDto): Promise<boolean> {
+  async changePassword(
+    memberId: string,
+    dto: ChangePasswordDto,
+  ): Promise<boolean> {
     const account = await this.accountsRepository.findByMemberId(memberId);
     if (!account) throw new NotFoundException('Không tìm thấy tài khoản');
 
     const isMatch = await bcrypt.compare(dto.oldPassword, account.passwordHash);
     if (!isMatch) throw new BadRequestException('Mật khẩu cũ không chính xác');
 
-    const isSamePassword = await bcrypt.compare(dto.newPassword, account.passwordHash);
-    if (isSamePassword) throw new BadRequestException('Mật khẩu mới không được trùng với mật khẩu cũ');
+    const isSamePassword = await bcrypt.compare(
+      dto.newPassword,
+      account.passwordHash,
+    );
+    if (isSamePassword)
+      throw new BadRequestException(
+        'Mật khẩu mới không được trùng với mật khẩu cũ',
+      );
 
     const hashedNewPassword = await bcrypt.hash(dto.newPassword, 10);
     await this.accountsRepository.update(account._id.toString(), {
