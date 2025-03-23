@@ -1,95 +1,120 @@
 import {
-    Controller,
-    Post,
-    Body,
-    UploadedFile,
-    UseInterceptors,
-    UseGuards,
-    Get,
-    Query,
-    HttpCode,
-    HttpStatus,
-    BadRequestException,
-  } from '@nestjs/common';
-  import { FileInterceptor } from '@nestjs/platform-express';
-  import { ApiTags, ApiOperation, ApiConsumes, ApiBody, ApiResponse } from '@nestjs/swagger';
-  import { FacialSearchService } from '../service/facial-search.service';
-  import { MulterFile } from 'src/common/types/multer-file.type';
-  import { winstonLogger as logger } from 'src/common/winston-logger';
- 
-  import { Role } from 'src/utils/enum';
-  
-  @ApiTags('Facial Search')
-  @Controller('facial-search')
-//   @UseGuards(AuthGuard, RolesGuard)
-  export class FacialSearchController {
-    constructor(private readonly facialSearchService: FacialSearchService) {}
-  
-    @Post('search')
-    @HttpCode(HttpStatus.OK)
-    @ApiOperation({ summary: 'Search for similar faces using an uploaded image' })
-    @ApiConsumes('multipart/form-data')
-    @ApiBody({
-      schema: {
-        type: 'object',
-        properties: {
-          file: {
-            type: 'string',
-            format: 'binary',
-            description: 'Image file containing a face to search for',
-          },
-          similarityThreshold: {
-            type: 'number',
-            description: 'Minimum similarity score (0-1) to include in results',
-            default: 0.6,
-          },
-          maxResults: {
-            type: 'number',
-            description: 'Maximum number of results to return',
-            default: 10,
-          },
-        },
-      },
-    })
-    @ApiResponse({
-      status: 200,
-      description: 'Returns a list of members with similar faces',
-    })
-    @UseInterceptors(FileInterceptor('file'))
-    async searchFaces(
-      @UploadedFile() file: MulterFile,
-      @Query('similarityThreshold') similarityThreshold = 0.6,
-      @Query('maxResults') maxResults = 10,
-    ) {
-      if (!file) {
-        throw new BadRequestException('Image file is required');
-      }
-  
-      logger.info(`Received facial search request with threshold: ${similarityThreshold}, maxResults: ${maxResults}`);
-      
-      const threshold = parseFloat(similarityThreshold.toString());
-      const limit = parseInt(maxResults.toString(), 10);
-      
-      if (isNaN(threshold) || threshold < 0 || threshold > 1) {
-        throw new BadRequestException('similarityThreshold must be a number between 0 and 1');
-      }
-      
-      if (isNaN(limit) || limit < 1) {
-        throw new BadRequestException('maxResults must be a positive number');
-      }
-  
-      return this.facialSearchService.searchFacesByImage(file, threshold, limit);
+  Controller,
+  Post,
+  UploadedFile,
+  UseInterceptors,
+  Query,
+  BadRequestException,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { FacialSearchService, FacialSearchOptions } from '../service/facial-search.service';
+import { MulterFile } from 'src/common/types/multer-file.type';
+import { winstonLogger as logger } from 'src/common/winston-logger';
+
+@Controller('facial-search')
+export class FacialSearchController {
+  constructor(private readonly facialSearchService: FacialSearchService) {}
+
+  /**
+   * Search for similar faces with advanced options
+   */
+  @Post('search')
+  @UseInterceptors(FileInterceptor('file'))
+  async searchFaces(
+    @UploadedFile() file: MulterFile,
+    @Query('similarityThreshold') similarityThreshold?: number,
+    @Query('maxResults') maxResults?: number,
+    @Query('includeDetails') includeDetails?: boolean,
+    @Query('filterGender') filterGender?: string,
+    @Query('filterAgeMin') filterAgeMin?: number,
+    @Query('filterAgeMax') filterAgeMax?: number,
+    @Query('sortBy') sortBy?: 'similarity' | 'recent' | 'name',
+  ) {
+    if (!file) {
+      throw new BadRequestException('Image file is required');
     }
-  
-    @Post('generate-embeddings')
-    // @Roles(Role.ADMIN)
-    @ApiOperation({ summary: 'Generate face embeddings for all existing members (admin only)' })
-    @ApiResponse({
-      status: 200,
-      description: 'Returns the count of successfully generated and failed embeddings',
-    })
-    async generateEmbeddings() {
-      logger.info('Received request to generate face embeddings for all members');
-      return this.facialSearchService.generateEmbeddingsForAllMembers();
+
+    logger.info(`Received facial search request with options:`, {
+      similarityThreshold,
+      maxResults,
+      includeDetails,
+      filterGender,
+      filterAgeMin,
+      filterAgeMax,
+      sortBy,
+    });
+
+    // Validate input parameters
+    const threshold = similarityThreshold ? parseFloat(similarityThreshold.toString()) : undefined;
+    const limit = maxResults ? parseInt(maxResults.toString(), 10) : undefined;
+
+    if (threshold !== undefined && (isNaN(threshold) || threshold < 0 || threshold > 1)) {
+      throw new BadRequestException('similarityThreshold must be a number between 0 and 1');
     }
+
+    if (limit !== undefined && (isNaN(limit) || limit < 1)) {
+      throw new BadRequestException('maxResults must be a positive number');
+    }
+
+    // const filterAgeRange = filterAgeMin !== undefined && filterAgeMax !== undefined
+    //   ? [parseInt(filterAgeMin.toString(), 10), parseInt(filterAgeMax.toString(), 10)]
+    //   : undefined;
+
+    // Construct search options object
+    const searchOptions: FacialSearchOptions = {
+      similarityThreshold: threshold,
+      maxResults: limit,
+      includeDetails: includeDetails !== undefined ? includeDetails : true,
+      filterGender,
+      // filterAgeRange,
+      sortBy: sortBy || 'similarity',
+    };
+
+    return this.facialSearchService.searchFacesByImage(file, searchOptions);
   }
+
+  /**
+   * Generate face embeddings for all members
+   */
+  @Post('generate-embeddings')
+  async generateEmbeddings() {
+    logger.info('Received request to generate face embeddings for all members');
+    return this.facialSearchService.generateEmbeddingsForAllMembers();
+  }
+
+  /**
+   * Find duplicate faces in the system
+   */
+  @Post('find-duplicates')
+  async findDuplicateFaces(
+    @Query('similarityThreshold') similarityThreshold?: number
+  ) {
+    const threshold = similarityThreshold ? parseFloat(similarityThreshold.toString()) : 0.8;
+
+    if (isNaN(threshold) || threshold < 0 || threshold > 1) {
+      throw new BadRequestException('similarityThreshold must be a number between 0 and 1');
+    }
+
+    return this.facialSearchService.findDuplicateFaces(threshold);
+  }
+
+  /**
+   * Verify if a given image matches a specific member
+   */
+  @Post('verify')
+  @UseInterceptors(FileInterceptor('file'))
+  async verifyFace(
+    @UploadedFile() file: MulterFile,
+    @Query('memberId') memberId: string
+  ) {
+    if (!file) {
+      throw new BadRequestException('Image file is required');
+    }
+
+    if (!memberId) {
+      throw new BadRequestException('memberId is required');
+    }
+
+    return this.facialSearchService.verifyFaceAgainstMemberId(file, memberId);
+  }
+}

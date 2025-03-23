@@ -3,6 +3,7 @@ import { MediaResponseDto } from '../dto/response/media-response.dto';
 import { CreateMediaDto } from '../dto/request/create-media.dto';
 import { UpdateMediaDto } from '../dto/request/update-media.dto';
 import { v4 as uuidv4 } from 'uuid';
+
 // Interface để convert từ File sang Entity
 interface FileToEntityParams {
   ownerId: string;
@@ -11,7 +12,9 @@ interface FileToEntityParams {
   mimeType: string;
   size: number;
   url: string;
+  status?: 'avatar' | 'label' | 'unknown';  // Only for Members
 }
+
 export class MediaMapper {
   /**
    * Converts CreateMediaDto to Media entity for database storage
@@ -30,9 +33,10 @@ export class MediaMapper {
       updatedAt: new Date(),
     } as Media;
   }
+
   /**
-     * Map file upload to Media entity
-     */
+   * Map file upload to Media entity
+   */
   static toEntityFromFile(params: FileToEntityParams): Media {
     const media = new Media();
     media.ownerId = params.ownerId;
@@ -43,8 +47,15 @@ export class MediaMapper {
     media.size = params.size;
     media.createdAt = new Date();
     media.updatedAt = new Date();
+
+    // ✅ Ensure `status` is only added when `ownerType` is 'Member'
+    if (params.ownerType === 'Member' && params.status) {
+      (media as any).status = params.status; // Type assertion to bypass TS error
+    }
+
     return media;
   }
+
   /**
    * Converts UpdateMediaDto to a Partial<Media> for updating existing media.
    */
@@ -77,6 +88,7 @@ export class MediaMapper {
       size: media.size,
       createdAt: media.createdAt,
       updatedAt: media.updatedAt,
+      status: media.ownerType === 'Member' ? (media as any).status || 'unknown' : undefined, // Ensure `status` is only included for `Member`
     };
   }
 }

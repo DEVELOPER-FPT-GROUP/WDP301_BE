@@ -52,4 +52,18 @@ export class MediaRepository {
   async deleteMany(ids: string[]): Promise<void> {
     await this.mediaModel.deleteMany({ mediaId: { $in: ids } }).exec();
   }
+
+  async findByStatus(
+    status: 'unknown' | 'avatar' | 'label',
+    ownerType: 'Member'
+  ): Promise<Media[]> {
+    return this.mediaModel.find({ ownerType, status }).exec();
+  }
+
+  async deleteByStatus(
+    status: 'unknown' | 'avatar' | 'label',
+    ownerType: 'Member'
+  ): Promise<void> {
+    await this.mediaModel.deleteMany({ ownerType, status }).exec();
+  }
 }

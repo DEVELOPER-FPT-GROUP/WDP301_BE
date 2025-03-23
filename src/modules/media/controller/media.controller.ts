@@ -7,14 +7,12 @@ import {
   Put, 
   Delete, 
   UseInterceptors, 
-  UploadedFile, 
   BadRequestException 
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { CreateMediaDto } from '../dto/request/create-media.dto';
+
 import { UpdateMediaDto } from '../dto/request/update-media.dto';
 import { MediaResponseDto } from '../dto/response/media-response.dto';
-
+import { winstonLogger as logger } from 'src/common/winston-logger';
 import { ResponseDTO } from 'src/utils/response.dto';
 import { LoggingInterceptor } from 'src/common/interceptors/logging.interceptor';
 import { MediaService } from '../serivce/media.service';
@@ -23,20 +21,6 @@ import { MediaService } from '../serivce/media.service';
 @UseInterceptors(LoggingInterceptor)
 export class MediaController {
   constructor(private readonly mediaService: MediaService) {}
-
-  //  /**
-  //  * 📤 Upload Media File (Base64) & Save to Cloudinary
-  //  */
-  //  @Post('upload')
-  //  async uploadMedia(
-  //    @Body() createMediaDto: CreateMediaDto
-  //  ): Promise<ResponseDTO<MediaResponseDto>> {
-  //    if (!createMediaDto.base64) {
-  //      throw new BadRequestException('Base64 string is required for upload');
-  //    }
-  //    const result = await this.mediaService.uploadMedia(createMediaDto);
-  //    return ResponseDTO.success(result, 'Media uploaded successfully');
-  //  }
 
   /**
    * 📌 Get all media records
@@ -92,4 +76,17 @@ export class MediaController {
     const result = await this.mediaService.deleteMedia(id);
     return ResponseDTO.success(result, `Media with id ${id} deleted successfully`);
   }
+  @Post('/verify-upload')
+  async verifyUpload(
+    @Body() body: { verifiedFaces: { faceId: string; memberId: string; status: 'avatar' | 'label' | 'unknown' }[] }
+  ): Promise<MediaResponseDto[]> {
+    if (!body.verifiedFaces || !Array.isArray(body.verifiedFaces) || body.verifiedFaces.length === 0) {
+      throw new BadRequestException('Invalid request: verifiedFaces must be a non-empty array.');
+    }
+  
+    logger.http(`📥 Received verified faces: ${JSON.stringify(body.verifiedFaces)}`);
+  
+    return await this.mediaService.verifyAndUploadFaces(body.verifiedFaces);
+  }
+  
 }

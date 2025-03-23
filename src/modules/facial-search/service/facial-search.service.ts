@@ -8,15 +8,31 @@ import { MembersRepository } from 'src/modules/members/repository/members.reposi
 import { MediaRepository } from 'src/modules/media/repository/media.repository';
 import { MemberDTO } from 'src/modules/members/dto/response/member.dto';
 import { ConversionUtil } from 'src/utils/conversion.util';
+import * as axios from 'axios';
 
 export interface FacialSearchResult {
   memberId: string;
   similarity: number;
   memberDetails?: MemberDTO;
+  confidenceLevel?: 'high' | 'medium' | 'low';
+}
+
+export interface FacialSearchOptions {
+  similarityThreshold?: number;
+  maxResults?: number;
+  includeDetails?: boolean;
+  filterGender?: string;
+  filterAgeRange?: [number, number];
+  sortBy?: 'similarity' | 'recent' | 'name';
 }
 
 @Injectable()
 export class FacialSearchService {
+  // Default similarity thresholds for different confidence levels
+  private readonly HIGH_CONFIDENCE_THRESHOLD = 0.82;
+  private readonly MEDIUM_CONFIDENCE_THRESHOLD = 0.72;
+  private readonly MIN_CONFIDENCE_THRESHOLD = 0.65;
+  
   constructor(
     private readonly faceEmbeddingRepository: FaceEmbeddingRepository,
     private readonly faceEmbeddingService: FaceEmbeddingService,
@@ -47,7 +63,7 @@ export class FacialSearchService {
       }
       
       // Download image from Cloudinary or fetch from storage
-      const imageBuffer = await this.mediaService.getMediaBuffer(media.url);
+      const imageBuffer = await this.getMediaBuffer(media.url);
       
       if (!imageBuffer) {
         throw new BadRequestException('Failed to retrieve image data');
@@ -87,13 +103,25 @@ export class FacialSearchService {
   }
 
   /**
-   * Search for similar faces across all members
+   * Search for similar faces across all members with enhanced options and filtering
    */
-  async searchFacesByImage(file: MulterFile, similarityThreshold = 0.6, maxResults = 10): Promise<FacialSearchResult[]> {
+  async searchFacesByImage(
+    file: MulterFile, 
+    options: FacialSearchOptions = {}
+  ): Promise<FacialSearchResult[]> {
     try {
-      logger.info(`🔍 Searching for similar faces with threshold: ${similarityThreshold}`);
+      const {
+        similarityThreshold = this.MIN_CONFIDENCE_THRESHOLD,
+        maxResults = 10,
+        includeDetails = true,
+        filterGender,
+        filterAgeRange,
+        sortBy = 'similarity'
+      } = options;
       
-      // Extract embedding from the uploaded image
+      logger.info(`🔍 Searching for similar faces with threshold: ${similarityThreshold}, options: ${JSON.stringify(options)}`);
+      
+      // Extract embedding from the uploaded image with enhanced face detection
       const embeddingResult = await this.faceEmbeddingService.extractFaceEmbedding(file);
       
       if (!embeddingResult.success || !embeddingResult.faceDescriptor) {
@@ -108,7 +136,7 @@ export class FacialSearchService {
         return [];
       }
       
-      // Calculate similarity with each stored embedding
+      // Calculate similarity with each stored embedding using the hybrid algorithm
       const results: FacialSearchResult[] = [];
       const processedMemberIds = new Set<string>();
       
@@ -120,56 +148,123 @@ export class FacialSearchService {
           continue;
         }
         
-        const similarity = this.faceEmbeddingService.calculateSimilarity(
+        // Use the improved hybrid similarity calculation
+        const similarity = this.faceEmbeddingService.calculateHybridSimilarity(
           embeddingResult.faceDescriptor,
           new Float32Array(embedding.faceDescriptor)
         );
         
         if (similarity >= similarityThreshold) {
+          // Determine confidence level based on similarity score
+          let confidenceLevel: 'high' | 'medium' | 'low';
+          
+          if (similarity >= this.HIGH_CONFIDENCE_THRESHOLD) {
+            confidenceLevel = 'high';
+          } else if (similarity >= this.MEDIUM_CONFIDENCE_THRESHOLD) {
+            confidenceLevel = 'medium';
+          } else {
+            confidenceLevel = 'low';
+          }
+          
           results.push({
             memberId,
             similarity,
+            confidenceLevel
           });
           processedMemberIds.add(memberId);
         }
       }
       
-      // Sort by similarity (highest first) and limit results
-      const sortedResults = results
-        .sort((a, b) => b.similarity - a.similarity)
-        .slice(0, maxResults);
+      // Apply any member filtering criteria if needed
+      let filteredResults = [...results];
       
-      // Fetch member details for each result
-      const enrichedResults = await Promise.all(
-        sortedResults.map(async (result) => {
-          try {
-            const member = await this.membersRepository.findById(result.memberId);
-            if (member) {
-              // Get member media
-              const media = await this.mediaRepository.findByOwners(
-                [result.memberId],
-                'Member'
-              );
-              
-              const memberDTO = MemberDTO.map(member);
-              return {
-                ...result,
-                memberDetails: {
-                  ...memberDTO,
-                  media,
-                },
-              };
-            }
-            return result;
-          } catch (error) {
-            logger.error(`Error fetching member details for ID ${result.memberId}: ${error.message}`);
-            return result;
+      if (filterGender || filterAgeRange) {
+        // Get all member IDs from results for batch fetching
+        const memberIds = filteredResults.map(result => result.memberId);
+        
+        // Fetch basic member info for filtering
+        const members = await this.membersRepository.findByIds(memberIds);
+        const memberMap = new Map(members.map(m => [m._id.toString(), m]));
+        
+        // Apply filters
+        filteredResults = filteredResults.filter(result => {
+          const member = memberMap.get(result.memberId);
+          if (!member) return false;
+          
+          // Gender filter
+          if (filterGender && member.gender !== filterGender) {
+            return false;
           }
-        })
-      );
+          
+          // // Age range filter
+          // if (filterAgeRange && member.age) {
+          //   const [minAge, maxAge] = filterAgeRange;
+          //   if (member.age < minAge || member.age > maxAge) {
+          //     return false;
+          //   }
+          // }
+          
+          return true;
+        });
+      }
       
-      logger.info(`✅ Found ${enrichedResults.length} similar faces`);
-      return enrichedResults;
+      // Sort results based on the sortBy parameter
+      switch (sortBy) {
+        case 'similarity':
+          // Default sorting by similarity (highest first)
+          filteredResults.sort((a, b) => b.similarity - a.similarity);
+          break;
+        case 'recent':
+          // For sorting by most recent, need to get member creation dates
+          // This would require additional database fetches and sorting by createdAt
+          // Implement if needed
+          break;
+        case 'name':
+          // For sorting by name, need to get member names
+          // This would require additional database fetches and sorting by name
+          // Implement if needed
+          break;
+      }
+      
+      // Limit the results
+      const limitedResults = filteredResults.slice(0, maxResults);
+      
+      // If full details are requested, enrich the results with member information
+      if (includeDetails) {
+        const enrichedResults = await Promise.all(
+          limitedResults.map(async (result) => {
+            try {
+              const member = await this.membersRepository.findById(result.memberId);
+              if (member) {
+                // Get member media
+                const media = await this.mediaRepository.findByOwners(
+                  [result.memberId],
+                  'Member'
+                );
+                
+                const memberDTO = MemberDTO.map(member);
+                return {
+                  ...result,
+                  memberDetails: {
+                    ...memberDTO,
+                    media,
+                  },
+                };
+              }
+              return result;
+            } catch (error) {
+              logger.error(`Error fetching member details for ID ${result.memberId}: ${error.message}`);
+              return result;
+            }
+          })
+        );
+        
+        logger.info(`✅ Found ${enrichedResults.length} similar faces with enhanced search`);
+        return enrichedResults;
+      }
+      
+      logger.info(`✅ Found ${limitedResults.length} similar faces`);
+      return limitedResults;
     } catch (error) {
       logger.error(`❌ Face search error: ${error.message}`);
       throw new BadRequestException(`Face search failed: ${error.message}`);
@@ -189,28 +284,39 @@ export class FacialSearchService {
       let successCount = 0;
       let failedCount = 0;
       
-      for (const member of members) {
-        const memberId = member._id.toString();
+      // Use batching to process members in chunks for better performance
+      const BATCH_SIZE = 20;
+      for (let i = 0; i < members.length; i += BATCH_SIZE) {
+        const memberBatch = members.slice(i, i + BATCH_SIZE);
         
-        // Get member's media
-        const mediaList = await this.mediaRepository.findByOwners([memberId], 'Member');
+        // Process batch in parallel
+        await Promise.all(
+          memberBatch.map(async (member) => {
+            const memberId = member._id.toString();
+            
+            // Get member's media
+            const mediaList = await this.mediaRepository.findByOwners([memberId], 'Member');
+            
+            if (!mediaList.length) {
+              logger.warn(`No media found for member ID: ${memberId}`);
+              return;
+            }
+            
+            // Process each media item
+            for (const media of mediaList) {
+              const mediaId = media.mediaId.toString();
+              const success = await this.generateEmbeddingForMember(mediaId, memberId);
+              
+              if (success) {
+                successCount++;
+              } else {
+                failedCount++;
+              }
+            }
+          })
+        );
         
-        if (!mediaList.length) {
-          logger.warn(`No media found for member ID: ${memberId}`);
-          continue;
-        }
-        
-        // Process each media item
-        for (const media of mediaList) {
-          const mediaId = media.mediaId.toString();
-          const success = await this.generateEmbeddingForMember(mediaId, memberId);
-          
-          if (success) {
-            successCount++;
-          } else {
-            failedCount++;
-          }
-        }
+        logger.info(`Processed batch ${i/BATCH_SIZE + 1}/${Math.ceil(members.length/BATCH_SIZE)}`);
       }
       
       logger.info(`✅ Completed generating embeddings. Success: ${successCount}, Failed: ${failedCount}`);
@@ -220,35 +326,196 @@ export class FacialSearchService {
       throw new BadRequestException(`Failed to generate embeddings: ${error.message}`);
     }
   }
+
+  /**
+   * Store face embedding for a member
+   */
   async storeEmbeddingForMember(mediaId: string, memberId: string, faceDescriptor: number[]): Promise<boolean> {
     try {
-        logger.info(`🧠 Storing face embedding for media ID: ${mediaId}, member ID: ${memberId}`);
+      logger.info(`🧠 Storing face embedding for media ID: ${mediaId}, member ID: ${memberId}`);
 
-        if (!faceDescriptor || faceDescriptor.length === 0) {
-            logger.warn(`⚠️ Empty face descriptor received for media ID: ${mediaId}`);
-            return false;
-        }
-
-        // Check if an embedding already exists for this media
-        const existingEmbedding = await this.faceEmbeddingRepository.findByMediaId(mediaId);
-        if (existingEmbedding) {
-            logger.info(`🔄 Face embedding already exists for media ID: ${mediaId}, updating instead.`);
-            await this.faceEmbeddingRepository.update(mediaId, { faceDescriptor });
-        } else {
-            // Store new embedding
-            await this.faceEmbeddingRepository.create({
-                memberId: ConversionUtil.toObjectId(memberId),
-                mediaId,
-                faceDescriptor,
-            });
-        }
-
-        logger.info(`✅ Successfully stored face embedding for member ID: ${memberId}`);
-        return true;
-    } catch (error) {
-        logger.error(`❌ Error storing face embedding: ${error.message}`);
+      if (!faceDescriptor || faceDescriptor.length === 0) {
+        logger.warn(`⚠️ Empty face descriptor received for media ID: ${mediaId}`);
         return false;
-    }
-}
+      }
 
+      // Check if an embedding already exists for this media
+      const existingEmbedding = await this.faceEmbeddingRepository.findByMediaId(mediaId);
+      if (existingEmbedding) {
+        logger.info(`🔄 Face embedding already exists for media ID: ${mediaId}, updating instead.`);
+        await this.faceEmbeddingRepository.update(mediaId, { faceDescriptor });
+      } else {
+        // Store new embedding
+        await this.faceEmbeddingRepository.create({
+          memberId: ConversionUtil.toObjectId(memberId),
+          mediaId,
+          faceDescriptor,
+        });
+      }
+
+      logger.info(`✅ Successfully stored face embedding for member ID: ${memberId}`);
+      return true;
+    } catch (error) {
+      logger.error(`❌ Error storing face embedding: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Find duplicate faces across the database
+   * Useful for identifying potential duplicate member profiles
+   */
+  async findDuplicateFaces(similarityThreshold = 0.8): Promise<{ memberIdA: string; memberIdB: string; similarity: number }[]> {
+    try {
+      logger.info(`🔍 Searching for duplicate faces with threshold: ${similarityThreshold}`);
+      
+      // Get all stored embeddings
+      const allEmbeddings = await this.faceEmbeddingRepository.findAll();
+      
+      if (allEmbeddings.length < 2) {
+        return [];
+      }
+      
+      const duplicates: { memberIdA: string; memberIdB: string; similarity: number }[] = [];
+      const comparedPairs = new Set<string>();
+      
+      // Compare each embedding with every other embedding
+      for (let i = 0; i < allEmbeddings.length; i++) {
+        const embedA = allEmbeddings[i];
+        const memberIdA = embedA.memberId.toString();
+        
+        for (let j = i + 1; j < allEmbeddings.length; j++) {
+          const embedB = allEmbeddings[j];
+          const memberIdB = embedB.memberId.toString();
+          
+          // Skip if same member or already compared
+          if (memberIdA === memberIdB) {
+            continue;
+          }
+          
+          // Create a unique key for this pair of members
+          const pairKey = [memberIdA, memberIdB].sort().join('|');
+          if (comparedPairs.has(pairKey)) {
+            continue;
+          }
+          comparedPairs.add(pairKey);
+          
+          // Calculate similarity using hybrid method
+          const similarity = this.faceEmbeddingService.calculateHybridSimilarity(
+            new Float32Array(embedA.faceDescriptor),
+            new Float32Array(embedB.faceDescriptor)
+          );
+          
+          if (similarity >= similarityThreshold) {
+            duplicates.push({
+              memberIdA,
+              memberIdB,
+              similarity
+            });
+          }
+        }
+      }
+      
+      // Sort by similarity (highest first)
+      duplicates.sort((a, b) => b.similarity - a.similarity);
+      
+      logger.info(`✅ Found ${duplicates.length} potential duplicate faces`);
+      return duplicates;
+    } catch (error) {
+      logger.error(`❌ Error finding duplicate faces: ${error.message}`);
+      throw new BadRequestException(`Failed to find duplicate faces: ${error.message}`);
+    }
+  }
+
+  /**
+   * Fetch image buffer from a URL
+   */
+  async getMediaBuffer(url: string): Promise<Buffer> {
+    try {
+      logger.http(`Fetching media from URL: ${url}`);
+      const response = await axios.default.get(url, {
+        responseType: 'arraybuffer',
+      });
+      
+      if (response.status !== 200) {
+        throw new BadRequestException(`Failed to fetch image, status: ${response.status}`);
+      }
+      
+      logger.info(`Successfully fetched image from URL: ${url}`);
+      return Buffer.from(response.data);
+    } catch (error) {
+      logger.error(`Error fetching media from URL: ${error.message}`);
+      throw new BadRequestException(`Failed to fetch media: ${error.message}`);
+    }
+  }
+
+  /**
+   * Verify if a person in an uploaded image matches a specific member ID
+   */
+  async verifyFaceAgainstMemberId(file: MulterFile, memberId: string): Promise<{ 
+    isMatch: boolean; 
+    similarity: number; 
+    confidenceLevel: 'high' | 'medium' | 'low' | 'none';
+  }> {
+    try {
+      logger.info(`Verifying face against member ID: ${memberId}`);
+      
+      // Get member's face embeddings
+      const memberEmbeddings = await this.faceEmbeddingRepository.findByMemberId(memberId);
+      
+      if (!memberEmbeddings.length) {
+        logger.warn(`No face embeddings found for member ID: ${memberId}`);
+        return { isMatch: false, similarity: 0, confidenceLevel: 'none' };
+      }
+      
+      // Extract embedding from the uploaded image
+      const uploadedEmbedding = await this.faceEmbeddingService.extractFaceEmbedding(file);
+      
+      if (!uploadedEmbedding.success || !uploadedEmbedding.faceDescriptor) {
+        logger.warn('No face detected in the uploaded image');
+        return { isMatch: false, similarity: 0, confidenceLevel: 'none' };
+      }
+      
+      // Compare uploaded face with all stored faces for the member
+      // Keep track of best match
+      let bestSimilarity = 0;
+      
+      for (const embedding of memberEmbeddings) {
+        const similarity = this.faceEmbeddingService.calculateHybridSimilarity(
+          uploadedEmbedding.faceDescriptor,
+          new Float32Array(embedding.faceDescriptor)
+        );
+        
+        if (similarity > bestSimilarity) {
+          bestSimilarity = similarity;
+        }
+      }
+      
+      // Determine match and confidence level
+      let isMatch = false;
+      let confidenceLevel: 'high' | 'medium' | 'low' | 'none' = 'none';
+      
+      if (bestSimilarity >= this.HIGH_CONFIDENCE_THRESHOLD) {
+        isMatch = true;
+        confidenceLevel = 'high';
+      } else if (bestSimilarity >= this.MEDIUM_CONFIDENCE_THRESHOLD) {
+        isMatch = true;
+        confidenceLevel = 'medium';
+      } else if (bestSimilarity >= this.MIN_CONFIDENCE_THRESHOLD) {
+        isMatch = true;
+        confidenceLevel = 'low';
+      }
+      
+      logger.info(`Face verification result: isMatch=${isMatch}, similarity=${bestSimilarity.toFixed(4)}, confidence=${confidenceLevel}`);
+      
+      return {
+        isMatch,
+        similarity: bestSimilarity,
+        confidenceLevel
+      };
+    } catch (error) {
+      logger.error(`❌ Error verifying face: ${error.message}`);
+      throw new BadRequestException(`Face verification failed: ${error.message}`);
+    }
+  }
 }

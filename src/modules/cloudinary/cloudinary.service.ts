@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { v2 as cloudinary, UploadApiResponse } from 'cloudinary';
 import { MulterFile } from 'src/common/types/multer-file.type';
-
+import { winstonLogger as logger } from 'src/common/winston-logger';
 @Injectable()
 export class CloudinaryService {
   /**
@@ -138,4 +138,61 @@ export class CloudinaryService {
       throw new BadRequestException(`Failed to upload base64 image: ${error.message}`);
     }
   }
+
+  async getExistingFile(faceId: string): Promise<{ url: string; size: number; format: string } | null> {
+    try {
+      logger.http(`🔍 Retrieving existing file for faceId: ${faceId}`);
+  
+      const cloudinary = await import('cloudinary').then((pkg) => pkg.v2);
+  
+      const response = await cloudinary.api.resource(faceId, {
+        resource_type: 'image',
+      });
+  
+      if (!response || !response.secure_url) {
+        logger.warn(`⚠️ File with faceId: ${faceId} not found in Cloudinary`);
+        return null;
+      }
+  
+      logger.info(`✅ Successfully retrieved file for faceId: ${faceId}`);
+  
+      return {
+        url: response.secure_url,
+        size: response.bytes,
+        format: response.format,
+      };
+    } catch (error) {
+      if (error.http_code === 404) {
+        logger.warn(`⚠️ Cloudinary file not found for faceId: ${faceId}`);
+        return null;
+      }
+      logger.error(`❌ Error retrieving file from Cloudinary: ${error.message}`);
+      throw new BadRequestException(`Failed to retrieve file from Cloudinary: ${error.message}`);
+    }
+  }
+  
+  async deleteMultipleFilesByFaceIds(faceIds: string[]): Promise<void> {
+    if (!faceIds || faceIds.length === 0) {
+      logger.warn('⚠️ No faceIds provided for deletion.');
+      return;
+    }
+  
+    try {
+      logger.http(`🗑️ Deleting ${faceIds.length} files from Cloudinary`);
+  
+      const cloudinary = await import('cloudinary').then((pkg) => pkg.v2);
+  
+      // Call Cloudinary API to delete multiple files
+      const deleteResults = await cloudinary.api.delete_resources(faceIds, {
+        resource_type: 'image',
+      });
+  
+      logger.info(`✅ Successfully deleted ${Object.keys(deleteResults.deleted).length} files from Cloudinary.`);
+    } catch (error) {
+      logger.error(`❌ Error deleting files from Cloudinary: ${error.message}`);
+      throw new BadRequestException(`Failed to delete files from Cloudinary: ${error.message}`);
+    }
+  }
+  
+
 }
