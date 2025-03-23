@@ -18,6 +18,7 @@ import { OrdersModule } from './modules/orders/orders.module';
 import { TrackingsModule } from './modules/tracking/tracking.module';
 import { BranchModule } from './modules/branch/branch.module';
 import { HouseholdModule } from './modules/household/household.module';
+import { NotificationModule } from './modules/notifications/notifications.module';
 
 @Module({
   imports: [
@@ -48,7 +49,8 @@ import { HouseholdModule } from './modules/household/household.module';
     OrdersModule,
     TrackingsModule,
     BranchModule,
-    HouseholdModule
+    HouseholdModule,
+    NotificationModule
   ],
 })
 export class AppModule {}

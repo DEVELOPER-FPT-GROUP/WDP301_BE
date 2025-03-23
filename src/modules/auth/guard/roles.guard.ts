@@ -1,6 +1,15 @@
-import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from '../decorator/roles.decorator';
+
+// Enum for role names
+export enum UserRole {
+    MEMBER = 'Member',
+    HOUSEHOLD_HEAD = 'Household Head',
+    BRANCH_HEAD = 'Branch Head',
+    FAMILY_HEAD = 'Family Head',
+    SUPER_ADMIN = 'Super Admin'
+}
 
 @Injectable()
 export class RolesGuard implements CanActivate {
@@ -13,17 +22,19 @@ export class RolesGuard implements CanActivate {
         ]);
 
         if (!requiredRoles) {
-            return true; // If no roles are required, allow access
+            return true; // No specific roles required → allow access
         }
 
         const { user } = context.switchToHttp().getRequest();
-        if (!user) {
-            return false;
+        if (!user || !user.role) {
+            throw new ForbiddenException('Access denied: No user role found.');
         }
 
-        // Convert the isAdmin field to a role string
-        const userRole = user.isAdmin ? 'admin' : 'user';
+        // Exclude Super Admin from Event Management
+        if (user.role === UserRole.SUPER_ADMIN && requiredRoles.includes(user.role)) {
+            throw new ForbiddenException('Super Admin is not allowed to manage events.');
+        }
 
-        return requiredRoles.includes(userRole);
+        return requiredRoles.includes(user.role);
     }
 }
