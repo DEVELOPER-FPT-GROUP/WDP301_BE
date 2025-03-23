@@ -88,77 +88,86 @@ export class FaceDetectionService implements IFaceDetectionService {
     }
   }
 
-  async detectAndCropFace(file: MulterFile): Promise<FaceDetectionResult> {
+  async detectAndCropFaces(file: MulterFile): Promise<FaceDetectionResult[]> {
     try {
       logger.info(`🔍 Starting face detection for file: ${file.originalname}`);
+  
+      // Save image buffer as a temporary file
       const tempFilePath = await this.saveBufferToTempFile(file.buffer);
       const processedFilePath = await this.convertWebPIfNeeded(tempFilePath);
-
+  
       const faceapi = await this.getFaceApi();
       const canvas = await import('canvas');
       const sharp = (await import('sharp')).default || require('sharp');
-
-
+  
       // Load image into a canvas
       const image = await canvas.loadImage(processedFilePath);
       const c = canvas.createCanvas(image.width, image.height);
       const ctx = c.getContext('2d');
       ctx.drawImage(image, 0, 0, image.width, image.height);
-
+  
       // Perform face detection
       const detections = await faceapi.detectAllFaces(c)
           .withFaceLandmarks()
           .withFaceDescriptors();
-
+  
       if (detections.length === 0) {
         logger.warn(`❌ No faces detected in image: ${file.originalname}`);
         await unlink(processedFilePath);
-        return { success: false, message: 'No faces detected in the image' };
+        return [];
       }
-
+  
       logger.info(`✅ Detected ${detections.length} faces in image: ${file.originalname}`);
-
-      let primaryFace = detections.length > 1
-          ? detections.sort((a, b) => (b.detection.box.width * b.detection.box.height) - (a.detection.box.width * a.detection.box.height))[0]
-          : detections[0];
-
-      const box = primaryFace.detection.box;
-      const paddingX = Math.floor(box.width * 0.5);
-      const paddingY = Math.floor(box.height * 0.7);
-
+  
       const metadata = await sharp(processedFilePath).metadata();
       const imgWidth = metadata.width ?? 0;
       const imgHeight = metadata.height ?? 0;
-
-      const newX = Math.max(0, box.x - paddingX);
-      const newY = Math.max(0, box.y - paddingY);
-      const newWidth = Math.min(imgWidth - newX, box.width + paddingX * 2);
-      const newHeight = Math.min(imgHeight - newY, box.height + paddingY * 2);
-
-      const faceBuffer = await sharp(processedFilePath)
-          .extract({ left: Math.floor(newX), top: Math.floor(newY), width: Math.floor(newWidth), height: Math.floor(newHeight) })
-          .toBuffer();
-
+  
+      // Create circular mask
       const avatarSize = 600;
       const circleMask = Buffer.from(
-          `<svg width="${avatarSize}" height="${avatarSize}">
+        `<svg width="${avatarSize}" height="${avatarSize}">
           <circle cx="${avatarSize / 2}" cy="${avatarSize / 2}" r="${avatarSize / 2}" fill="white"/>
         </svg>`
       );
-
-      const avatarBuffer = await sharp(faceBuffer)
-          .resize(avatarSize, avatarSize, { fit: 'cover', position: 'center' })
-          .composite([{ input: circleMask, blend: 'dest-in' }])
-          .png()
+  
+      // Process each detected face
+      const faceBuffers = await Promise.all(detections.map(async (detection, index) => {
+        const box = detection.detection.box;
+        const PADDING_FACTOR = 0.6; // Adjust for better framing
+        const paddingX = Math.floor(box.width * PADDING_FACTOR);
+        const paddingY = Math.floor(box.height * PADDING_FACTOR);
+        const newX = Math.max(0, box.x - paddingX);
+        const newY = Math.max(0, box.y - paddingY);
+        const newWidth = Math.min(imgWidth - newX, box.width + paddingX * 2);
+        const newHeight = Math.min(imgHeight - newY, box.height + paddingY * 2);
+  
+        const faceBuffer = await sharp(processedFilePath)
+          .extract({ left: Math.floor(newX), top: Math.floor(newY), width: Math.floor(newWidth), height: Math.floor(newHeight) })
+          .resize(avatarSize, avatarSize, { fit: 'cover' })
+          .sharpen()
+          .linear(1.2, -20) // Adjust contrast
+          .modulate({ brightness: 1.03 }) // Brightness enhancement
+          .composite([{ input: circleMask, blend: 'dest-in' }]) // Apply circular mask
+          .png({ compressionLevel: 9 }) // Optimize PNG
           .toBuffer();
-
-      // await unlink(processedFilePath);
-      logger.info(`✅ Face detection and cropping completed for: ${file.originalname}`);
-
-      return { success: true, faceBuffer: avatarBuffer };
+  
+        logger.info(`✅ Processed face ${index + 1} of ${detections.length}`);
+  
+        return { success: true, faceBuffer };
+      }));
+  
+      // Cleanup temp file
+      await unlink(processedFilePath);
+  
+      logger.info(`✅ Completed processing ${faceBuffers.length} faces from ${file.originalname}`);
+      
+      return faceBuffers;
     } catch (error) {
       logger.error(`❌ Face detection error: ${error.message}`);
-      return { success: false, message: `Face detection failed: ${error.message}` };
+      return [];
     }
   }
+  
+  
 }

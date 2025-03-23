@@ -32,8 +32,9 @@ import { PaginationDTO } from '../../../utils/pagination.dto';
 import { SearchMemberDto } from '../dto/request/search-member.dto';
 import { MulterFile } from '../../../common/types/multer-file.type';
 import { MediaResponseDto } from '../../media/dto/response/media-response.dto';
-import { MediaService } from '../../media/serivce/media.service';
+
 import { ChildDTO } from '../dto/response/child.dto';
+import { MediaService } from 'src/modules/media/serivce/media.service';
 
 @Injectable()
 export class MembersService implements IMembersService {
@@ -75,7 +76,7 @@ export class MembersService implements IMembersService {
     console.log("files: ", files);
     let mediaList: MediaResponseDto[] = [];
     if (files && files.length > 0) {
-      mediaList = await this.mediaService.uploadMultipleFiles(files, String(createdMember._id), 'Member');
+      mediaList = files && files.length > 0 ? await this.mediaService.processAndUploadAvatar(files[0], String(createdMember._id), 'Member') : [];
     }
 
     if(createdMember.isAlive) {

@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  NotFoundException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
@@ -23,28 +27,43 @@ import { FamiliesRepository } from '../../families/repository/families.repositor
 
 @Injectable()
 export class AuthService implements IAuthService {
-    private usedRefreshTokens = new Set<string>(); // Track used refresh tokens (Prevents replay attacks)
-    private usedAccessTokens = new Set<string>(); // Track used access tokens (Prevents reuse)
+  private usedRefreshTokens = new Set<string>(); // Track used refresh tokens (Prevents replay attacks)
+  private usedAccessTokens = new Set<string>(); // Track used access tokens (Prevents reuse)
 
-    constructor(
-      private jwtService: JwtService,
-      private accountsRepository: AccountsRepository,
-      private memberService: MembersService,
-      private familiesService: FamiliesService,
-      private accountsService: AccountsService,
-      private familiesRepository: FamiliesRepository
-    ) {}
+  constructor(
+    private jwtService: JwtService,
+    private accountsRepository: AccountsRepository,
+    private memberService: MembersService,
+    private familiesService: FamiliesService,
+    private accountsService: AccountsService,
+    private familiesRepository: FamiliesRepository,
+  ) {}
 
-    async validateUser(username: string, password: string): Promise<AccountResponseDto | null> {
-        const account = await this.accountsRepository.findByUsername(username);
-        if (account && (await bcrypt.compare(password, account.passwordHash))) {
-            return AccountMapper.toResponseDto(account);
-        }
-        return null;
+  async validateUser(
+    username: string,
+    password: string,
+  ): Promise<AccountResponseDto | null> {
+    const account = await this.accountsRepository.findByUsername(username);
+    if (account && (await bcrypt.compare(password, account.passwordHash))) {
+      return AccountMapper.toResponseDto(account);
+    }
+    return null;
+  }
+
+  async login(loginDto: LoginDto): Promise<AuthResponseDto> {
+    const account = await this.accountsRepository.findByUsername(
+      loginDto.username,
+    );
+
+    if (
+      !account ||
+      !(await bcrypt.compare(loginDto.password, account.passwordHash))
+    ) {
+      throw new NotFoundException('Your username or password is incorrect');
     }
 
-    async login(loginDto: LoginDto): Promise<AuthResponseDto> {
-        const account = await this.accountsRepository.findByUsername(loginDto.username);
+    const accessToken = await this.generateToken(account, '15m');
+    const refreshToken = await this.generateToken(account, '7d');
 
         if (!account) {
             throw new NotFoundException('Your username or password is incorrect');
@@ -55,86 +74,94 @@ export class AuthService implements IAuthService {
         if(!await bcrypt.compare(loginDto.password, password)) {
             throw new NotFoundException('Your username or password is incorrect');
         }
+    
+    // Store refresh token in database
+    await this.accountsRepository.updateRefreshToken(
+      String(account._id),
+      refreshToken,
+    );
 
-        const accessToken = await this.generateToken(account, '15m');
-        const refreshToken = await this.generateToken(account, '7d');
+    return new AuthResponseDto(accessToken);
+  }
 
-        // Store refresh token in database
-        await this.accountsRepository.updateRefreshToken(String(account._id), refreshToken);
+  private async generateToken(account: Account, ttl: string): Promise<string> {
+    const jti = crypto.randomUUID(); // Unique token ID
+    const family = await this.familiesRepository.findByAdminAccountId(
+      String(account._id),
+    );
 
-        return new AuthResponseDto(accessToken);
+    let member;
+    if (account.memberId) {
+      member = await this.memberService.getMemberById(String(account.memberId));
+    }
+    const payload = {
+      username: account.username,
+      memberId: account.memberId ? account.memberId : null,
+      familyId: family ? String(family._id) : member ? member.familyId : null,
+      jti,
+      role: account.role,
+      familyName: family ? family.familyName : null,
+    };
+
+    return this.jwtService.sign(payload, { expiresIn: ttl });
+  }
+
+  async refreshToken(
+    refreshTokenDto: RefreshTokenDto,
+  ): Promise<AuthResponseDto> {
+    const { refreshToken } = refreshTokenDto;
+
+    let payload;
+    try {
+      payload = this.jwtService.verify(refreshToken);
+    } catch (error) {
+      throw new UnauthorizedException('Invalid or expired refresh token');
     }
 
-    private async generateToken(account: Account, ttl: string): Promise<string> {
-        const jti = crypto.randomUUID(); // Unique token ID
-        const family = await this.familiesRepository.findByAdminAccountId(String(account._id));
-
-        let member;
-        if(account.memberId) {
-            member = await this.memberService.getMemberById(String(account.memberId));
-        }
-        const payload = {
-            username: account.username,
-            memberId: account.memberId ? account.memberId : null,
-            familyId: family ? String(family._id) : (member ? member.familyId : null),
-            jti,
-            role: account.role,
-        };
-
-        return this.jwtService.sign(payload, { expiresIn: ttl });
+    const account =
+      await this.accountsRepository.findByRefreshToken(refreshToken);
+    if (!account) {
+      throw new UnauthorizedException('Invalid refresh token');
     }
 
-    async refreshToken(refreshTokenDto: RefreshTokenDto): Promise<AuthResponseDto> {
-        const { refreshToken } = refreshTokenDto;
+    // Generate new access token with role and familyId
+    const accessToken = await this.generateToken(account, '15m');
 
-        let payload;
-        try {
-            payload = this.jwtService.verify(refreshToken);
-        } catch (error) {
-            throw new UnauthorizedException('Invalid or expired refresh token');
-        }
+    return new AuthResponseDto(accessToken);
+  }
 
-        const account = await this.accountsRepository.findByRefreshToken(refreshToken);
-        if (!account) {
-            throw new UnauthorizedException('Invalid refresh token');
-        }
+  async logout(logoutDto: LogoutDto): Promise<void> {
+    const account = await this.accountsRepository.findByMemberId(
+      logoutDto.memberId,
+    );
 
-        // Generate new access token with role and familyId
-        const accessToken = await this.generateToken(account, '15m');
-
-        return new AuthResponseDto(accessToken);
+    if (!account) {
+      throw new NotFoundException('User not found');
     }
 
-    async logout(logoutDto: LogoutDto): Promise<void> {
-        const account = await this.accountsRepository.findByMemberId(logoutDto.memberId);
+    // Clear the refresh token
+    await this.accountsRepository.updateRefreshToken(logoutDto.memberId, null);
+  }
 
-        if (!account) {
-            throw new NotFoundException('User not found');
-        }
+  async register(registerDto: RegisterDto): Promise<void> {
+    console.log('Registering new member as family leader:', registerDto);
 
-        // Clear the refresh token
-        await this.accountsRepository.updateRefreshToken(logoutDto.memberId, null);
-    }
+    const createAccountDto: CreateAccountDto = {
+      memberId: registerDto.memberId || '',
+      username: registerDto.username,
+      passwordHash: registerDto.password,
+      email: registerDto.email || '',
+      role: Role.FAMILY_LEADER,
+    };
 
-    async register(registerDto: RegisterDto): Promise<void> {
-        console.log('Registering new member as family leader:', registerDto);
+    const account =
+      await this.accountsService.createFamilyLeaderAccount(createAccountDto);
 
-        const createAccountDto: CreateAccountDto = {
-            memberId: registerDto.memberId || '',
-            username: registerDto.username,
-            passwordHash: registerDto.password,
-            email: registerDto.email || '',
-            role: Role.FAMILY_LEADER
-        }
+    const createFamilyDto: CreateFamilyDto = {
+      familyName: registerDto.familyName,
+      adminAccountId: account.accountId,
+    };
 
-        const account = await this.accountsService.createFamilyLeaderAccount(createAccountDto);
-
-        const createFamilyDto: CreateFamilyDto = {
-            familyName: registerDto.familyName,
-            adminAccountId: account.accountId
-        };
-
-        await this.familiesService.createFamily(createFamilyDto);
-    }
-
+    await this.familiesService.createFamily(createFamilyDto);
+  }
 }

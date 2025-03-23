@@ -161,18 +161,18 @@ export class MembersController {
     return ResponseDTO.success(result, 'Member retrieved successfully');
   }
 
-  @Post('avatar')
-  @UseInterceptors(FileInterceptor('file'))
-  async testFaceDetection(@UploadedFile() file: MulterFile) {
-    if (!file) {
-      throw new BadRequestException('No file uploaded');
-    }
+  // @Post('avatar')
+  // @UseInterceptors(FileInterceptor('file'))
+  // async testFaceDetection(@UploadedFile() file: MulterFile) {
+  //   if (!file) {
+  //     throw new BadRequestException('No file uploaded');
+  //   }
 
-    // Perform face detection
-    const result = await this.faceDetectionService.detectAndCropFace(file);
+  //   // Perform face detection
+  //   const result = await this.faceDetectionService.detectAndCropFaces(file);
 
-    return result;
-  }
+  //   return result;
+  // }
 
   @Put('/delete/:id')
   async removeMember(@Param('id') id: string): Promise<ResponseDTO<MemberDTO>> {
