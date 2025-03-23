@@ -22,5 +22,7 @@ export interface IAccountService {
 
   getAccountsWithPagination(searchDto: SearchAccountDto): Promise<PaginationDTO<AccountResponseDto>>;
 
-  getTotalAccountsCreated(year: number, month: number): Promise<number>
+  getTotalAccountsCreated(year: number, month: number): Promise<number>;
+
+  changePassword(memberId: string, dto: any): Promise<any>;
 }
