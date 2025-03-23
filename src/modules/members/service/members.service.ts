@@ -61,7 +61,7 @@ export class MembersService implements IMembersService {
     console.log("files: ", files);
     let mediaList: MediaResponseDto[] = [];
     if (files && files.length > 0) {
-      mediaList = await this.mediaService.uploadMultipleFiles(files, String(createdMember._id), 'Member');
+      mediaList = files && files.length > 0 ? await this.mediaService.processAndUploadAvatar(files[0], String(createdMember._id), 'Member') : [];
     }
 
     const memberDTO = MemberDTO.map(createdMember);

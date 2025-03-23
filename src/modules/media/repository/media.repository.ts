@@ -36,12 +36,14 @@ export class MediaRepository {
   }
 
   async createMany(mediaEntities: Media[]): Promise<Media[]> {
+    // Insert and retrieve the stored documents
     const result = await this.mediaModel.insertMany(mediaEntities);
-    return mediaEntities.map((entity, index) => ({
-      ...entity,
-      _id: result[index]._id,
-    }));
-  }
+
+    // Fetch the newly inserted documents from the database to ensure mediaId is included
+    const insertedIds = result.map((doc) => doc._id);
+    return await this.mediaModel.find({ _id: { $in: insertedIds } });
+}
+
 
   async findByIds(ids: string[]): Promise<Media[]> {
     return this.mediaModel.find({ mediaId: { $in: ids } }).exec();

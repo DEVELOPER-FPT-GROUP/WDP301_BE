@@ -2,6 +2,8 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  forwardRef,
+  Inject,
 } from '@nestjs/common';
 import { MediaResponseDto } from '../dto/response/media-response.dto';
 import { MediaMapper } from '../mapper/media.mapper';
@@ -12,6 +14,8 @@ import { winstonLogger as logger } from 'src/common/winston-logger';
 import { CloudinaryService } from 'src/modules/cloudinary/cloudinary.service';
 import { MulterFile } from 'src/common/types/multer-file.type';
 import { FaceDetectionService } from 'src/modules/ai-face-detection/service/face-detection.service';
+import * as axios from 'axios';
+import { FacialSearchService } from 'src/modules/facial-search/service/facial-search.service';
 
 @Injectable()
 export class MediaService {
@@ -19,6 +23,8 @@ export class MediaService {
     private readonly mediaRepository: MediaRepository,
     private readonly cloudinaryService: CloudinaryService,
     private readonly faceDetectionService: FaceDetectionService,
+    @Inject(forwardRef(() => FacialSearchService))
+    private readonly facialSearchService: FacialSearchService
   ) {}
 
   /**
@@ -179,9 +185,32 @@ export class MediaService {
     return mediaList.map(MediaMapper.toResponseDto);
   }
 
+
   /**
-   * Process avatar image, detect face, crop, and upload to Cloudinary
+   * Fetch image buffer from a URL
    */
+  async getMediaBuffer(url: string): Promise<Buffer> {
+    try {
+      logger.http(`Fetching media from URL: ${url}`);
+      const response = await axios.default.get(url, {
+        responseType: 'arraybuffer',
+      });
+      
+      if (response.status !== 200) {
+        throw new BadRequestException(`Failed to fetch image, status: ${response.status}`);
+      }
+      
+      logger.info(`Successfully fetched image from URL: ${url}`);
+      return Buffer.from(response.data);
+    } catch (error) {
+      logger.error(`Error fetching media from URL: ${error.message}`);
+      throw new BadRequestException(`Failed to fetch media: ${error.message}`);
+    }
+  }
+
+  /**
+ * Override the existing processAndUploadAvatar method to also generate face embeddings
+ */
   async processAndUploadAvatar(
     file: MulterFile,
     ownerId: string,
@@ -196,51 +225,53 @@ export class MediaService {
   
       // Detect and crop multiple faces
       const faceDetectionResults = await this.faceDetectionService.detectAndCropFaces(file);
-  
-      if (!faceDetectionResults.length) {
+      if (faceDetectionResults.length === 0) {
         throw new BadRequestException('No faces detected in the image.');
       }
   
       logger.info(`✅ Detected ${faceDetectionResults.length} face(s) for ${ownerType} ID: ${ownerId}`);
   
-      // Upload each detected face to Cloudinary
-      const uploadResults = await Promise.all(
+      // Upload detected faces concurrently
+      const mediaEntities = await Promise.all(
         faceDetectionResults.map(async (face, index) => {
+          const fileName = `avatar_${ownerId}_${index + 1}.png`;
           const uploadResult = await this.cloudinaryService.uploadFile({
             ...file,
-            buffer: face.faceBuffer ?? Buffer.alloc(0), // ✅ Ensures buffer is always defined
+            buffer: face.faceBuffer ?? Buffer.alloc(0),
             mimetype: 'image/png',
-            originalname: `avatar_${ownerId}_${index + 1}.png`,
+            originalname: fileName,
           });
   
-          if (!uploadResult || !uploadResult.secure_url) {
+          if (!uploadResult?.secure_url) {
             throw new BadRequestException(`Failed to upload avatar ${index + 1} to Cloudinary.`);
           }
   
-          return {
-            fileName: `avatar_${ownerId}_${index + 1}.png`,
+          return MediaMapper.toEntityFromFile({
+            ownerId,
+            ownerType,
+            fileName,
+            mimeType: 'image/png',
+            size: file.size,
             url: uploadResult.secure_url,
-          };
+          });
         })
       );
   
-      // Save all uploaded avatars to MongoDB
-      const mediaEntities = uploadResults.map(uploadResult =>
-        MediaMapper.toEntityFromFile({
-          ownerId,
-          ownerType,
-          fileName: uploadResult.fileName,
-          mimeType: 'image/png',
-          size: file.size,
-          url: uploadResult.url,
-        })
-      );
-  
+      // Save all uploaded avatars in MongoDB
       const mediaList = await this.mediaRepository.createMany(mediaEntities);
   
-      logger.info(
-        `✅ Successfully processed and uploaded ${mediaList.length} avatar(s) for ${ownerType} ID: ${ownerId}`
-      );
+      // Generate face embeddings in parallel
+      if (this.facialSearchService) {
+        await Promise.all(
+          mediaList.map((media) =>
+            this.facialSearchService.generateEmbeddingForMember(String(media.mediaId), ownerId).catch((error) => {
+              logger.warn(`Failed to generate face embedding: ${error.message}`);
+            })
+          )
+        );
+      }
+  
+      logger.info(`✅ Successfully processed and uploaded ${mediaList.length} avatar(s) for ${ownerType} ID: ${ownerId}`);
   
       return mediaList.map(MediaMapper.toResponseDto);
     } catch (error) {
@@ -248,6 +279,7 @@ export class MediaService {
       throw new BadRequestException(`Failed to process avatar: ${error.message}`);
     }
   }
+  
   
   
   /**
