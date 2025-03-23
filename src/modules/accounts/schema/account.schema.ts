@@ -18,6 +18,12 @@ export class Account {
   passwordHash: string;
 
   @Prop()
+  password: string;
+
+  @Prop()
+  defaultPassword: string;
+
+  @Prop()
   email: string;
 
   @Prop({ default: false })

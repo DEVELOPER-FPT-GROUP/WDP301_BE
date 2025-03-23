@@ -46,7 +46,13 @@ export class AuthService implements IAuthService {
     async login(loginDto: LoginDto): Promise<AuthResponseDto> {
         const account = await this.accountsRepository.findByUsername(loginDto.username);
 
-        if (!account || !(await bcrypt.compare(loginDto.password, account.passwordHash))) {
+        if (!account) {
+            throw new NotFoundException('Your username or password is incorrect');
+        }
+
+        let password = account.password ? account.password : account.passwordHash;
+
+        if(!await bcrypt.compare(loginDto.password, password)) {
             throw new NotFoundException('Your username or password is incorrect');
         }
 

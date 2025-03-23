@@ -46,6 +46,7 @@ export class AccountMapper {
       memberId: account.memberId.toString(),
       username: account.username,
       email: account.email,
+      defaultPassword: account.defaultPassword,
       isAdmin: account.isAdmin,
       createdAt: account.createdAt,
       updatedAt: account.updatedAt,

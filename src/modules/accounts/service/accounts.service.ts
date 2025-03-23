@@ -6,18 +6,20 @@ import { CreateAccountDto } from '../dto/request/create-account.dto';
 import { UpdateAccountDto } from '../dto/request/update-account.dto';
 import { AccountResponseDto } from '../dto/response/account.dto';
 import { AccountMapper } from '../mapper/account.mapper';
-import { CreateMemberDto } from '../../members/dto/request/create-member.dto';
 import { Promise } from 'mongoose';
 import { SearchAccountDto } from '../dto/request/search-account.dto';
 import { PaginationDTO } from 'src/utils/pagination.dto';
 import { Role } from '../../../utils/enum';
 import { TrackingsService } from 'src/modules/tracking/service/tracking.service';
+import { MembersRepository } from '../../members/repository/members.repository';
 
 @Injectable()
 export class AccountsService implements IAccountService {
-  constructor(private readonly accountsRepository: AccountsRepository,
+  constructor(
+    private readonly accountsRepository: AccountsRepository,
     @Inject(forwardRef(() => TrackingsService))
-    private readonly trackingsService: TrackingsService
+    private readonly trackingsService: TrackingsService,
+    private readonly membersRepository: MembersRepository,
   ) {
     this.ensureAdminAccount(); // Ensure admin account on service initialization
   }
@@ -47,10 +49,9 @@ export class AccountsService implements IAccountService {
   }
 
   async getAccountsWithPagination(searchDto: SearchAccountDto): Promise<PaginationDTO<AccountResponseDto>> {
-    const { page = 1, limit = 10, search, isAdmin } = searchDto;
+    const { page = 1, limit = 10, search, isAdmin, familyId } = searchDto;
 
-    // Khởi tạo bộ lọc tìm kiếm
-    const filters: any = {  };
+    const filters: any = {};
 
     if (isAdmin !== undefined) {
       filters.isAdmin = isAdmin;
@@ -61,7 +62,17 @@ export class AccountsService implements IAccountService {
       filters.$or = [{ username: regex }, { email: regex }];
     }
 
-    // Tìm tài khoản với phân trang
+    // 🔍 Tìm theo familyId thông qua liên kết với Member
+    if (familyId) {
+      const members = await this.membersRepository.findMembersInFamily(familyId);
+      const memberIds = members.map(m => m._id); // ✅ Lấy ra danh sách _id
+
+      if (memberIds.length === 0) {
+        return PaginationDTO.create([], 0, page, limit); // không có member nào thuộc family
+      }
+      filters.memberId = { $in: memberIds };
+    }
+
     const { records, total } = await this.accountsRepository.findAndCount(filters, page, limit);
 
     if (records.length === 0) return PaginationDTO.create([], 0, page, limit);
