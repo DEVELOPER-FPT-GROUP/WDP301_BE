@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Media, MediaSchema } from './schema/media.schema';
 import { MediaRepository } from './repository/media.repository';
@@ -10,6 +10,7 @@ import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { MulterModule } from '@nestjs/platform-express';
 import { FaceDetectionProvider } from '../ai-face-detection/providers/face-detection.provider';
 import { FaceDetectionService } from '../ai-face-detection/service/face-detection.service';
+import { FacialSearchModule } from '../facial-search/facial-search.module';
 
 @Module({
   imports: [
@@ -21,9 +22,10 @@ import { FaceDetectionService } from '../ai-face-detection/service/face-detectio
         files: 5, // ✅ Allow max 5 files per request
       },
     }),
+    forwardRef(() => FacialSearchModule)
   ],
   controllers: [MediaController], // ✅ Connect Controller
-  providers: [MediaService, MediaRepository, CloudinaryProvider, CloudinaryService,FaceDetectionProvider, FaceDetectionService], // ✅ Register Service & Repository
+  providers: [MediaService, MediaRepository, CloudinaryProvider, CloudinaryService,FaceDetectionProvider, FaceDetectionService],  // ✅ Register Service & Repository
   exports: [MediaService, MediaRepository], // ✅ Allow reusability in other modules
 })
 export class MediaModule {}

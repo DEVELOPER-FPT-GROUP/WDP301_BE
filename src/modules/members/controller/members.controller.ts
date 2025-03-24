@@ -146,6 +146,14 @@ export class MembersController {
     const members = await this.membersService.findMembersInFamily(familyId);
     return ResponseDTO.success(members, 'Members retrieved successfully');
   }
+  @Get('/get-accounts-in-family/:familyId')
+  async getAccountsByFamilyId(
+    @Param('familyId') familyId: string,
+  ): Promise<ResponseDTO<MemberDTO[]>> {
+    const result =
+      await this.membersService.searchAccountWithMemberId(familyId);
+    return ResponseDTO.success(result, 'Members retrieved successfully');
+  }
 
   @Post('/add-spouse')
   @UseInterceptors(FileFieldsInterceptor([{ name: 'files', maxCount: 10 }]))

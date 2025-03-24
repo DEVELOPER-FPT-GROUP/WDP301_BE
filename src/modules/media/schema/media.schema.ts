@@ -32,6 +32,12 @@ export class Media {
     @Prop({ required: true })
     size: number;
 
+    @Prop({
+        enum: ['avatar', 'label', 'unknown'],
+        default: 'unknown',
+    })
+    status?: 'avatar' | 'label' | 'unknown';
+
     @Prop({ default: Date.now })
     createdAt: Date;
 

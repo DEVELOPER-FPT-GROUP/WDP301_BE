@@ -9,5 +9,6 @@ export class MediaResponseDto {
     size: number;
     createdAt: Date;
     updatedAt: Date;
+    status?: 'avatar' | 'label' | 'unknown';
   }
   

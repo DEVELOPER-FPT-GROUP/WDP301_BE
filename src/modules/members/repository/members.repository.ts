@@ -8,11 +8,13 @@ import { UpdateMemberDto } from '../dto/request/update-member.dto';
 @Injectable()
 export class MembersRepository {
   constructor(
-    @InjectModel(Member.name) private memberModel: Model<MemberDocument>
-  ) { }
+    @InjectModel(Member.name) private memberModel: Model<MemberDocument>,
+  ) {}
 
   async findById(id: string): Promise<Member | null> {
-    return this.memberModel.findOne({ _id: new mongoose.Types.ObjectId(id) }).exec();
+    return this.memberModel
+      .findOne({ _id: new mongoose.Types.ObjectId(id) })
+      .exec();
   }
 
   async create(data: CreateMemberDto): Promise<Member> {
@@ -20,12 +22,13 @@ export class MembersRepository {
     return newMember.save();
   }
 
-  async update(id: string, updateData: UpdateMemberDto): Promise<Member | null> {
-    return this.memberModel.findOneAndUpdate(
-      { _id: id },
-      updateData,
-      { new: true }
-    ).exec();
+  async update(
+    id: string,
+    updateData: UpdateMemberDto,
+  ): Promise<Member | null> {
+    return this.memberModel
+      .findOneAndUpdate({ _id: id }, updateData, { new: true })
+      .exec();
   }
 
   async delete(id: string): Promise<boolean> {
@@ -48,12 +51,16 @@ export class MembersRepository {
    * @param limit - The number of records per page.
    * @returns An object containing the matching members and total count.
    */
-  async findByFilters(filters: any, page: number, limit: number): Promise<{ members: Member[]; total: number }> {
+  async findByFilters(
+    filters: any,
+    page: number,
+    limit: number,
+  ): Promise<{ members: Member[]; total: number }> {
     const skip = (page - 1) * limit;
 
     const [members, total] = await Promise.all([
       this.memberModel.find(filters).skip(skip).limit(limit).exec(),
-      this.memberModel.countDocuments(filters).exec()
+      this.memberModel.countDocuments(filters).exec(),
     ]);
 
     return { members, total };
@@ -72,7 +79,17 @@ export class MembersRepository {
   async findByIds(ids: string[]): Promise<Member[]> {
     if (!ids.length) return [];
 
-    return this.memberModel.find({ _id: { $in: ids.map(id => new mongoose.Types.ObjectId(id)) } }).lean().exec();
+    return this.memberModel
+      .find({ _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) } })
+      .lean()
+      .exec();
   }
+  async findMembersByFamilyIds(id: string): Promise<Member[]> {
+    if (!id.length) return [];
 
+    return this.memberModel
+      .find({ familyId: { $in: id } })
+      .lean()
+      .exec();
+  }
 }

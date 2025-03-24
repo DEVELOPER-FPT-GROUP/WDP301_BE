@@ -191,6 +191,12 @@ export class AccountsService implements IAccountService {
     const account = await this.accountsRepository.findByMemberId(memberId);
     return account ? AccountMapper.toResponseDto(account) : null;
   }
+  async getAccountByListMemberId(
+    memberIds: string[],
+  ): Promise<AccountResponseDto[] | null> {
+    const account = await this.accountsRepository.findByMemberListId(memberIds);
+    return account ? account.map((a) => AccountMapper.toResponseDto(a)) : null;
+  }
 
   /**
    * Updates an existing account and ensures username uniqueness.
