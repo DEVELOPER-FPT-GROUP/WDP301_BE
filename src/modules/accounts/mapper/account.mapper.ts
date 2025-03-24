@@ -2,7 +2,10 @@ import mongoose from 'mongoose';
 import { Account } from '../schema/account.schema';
 import { CreateAccountDto } from '../dto/request/create-account.dto';
 import { UpdateAccountDto } from '../dto/request/update-account.dto';
-import { AccountResponseDto } from '../dto/response/account.dto';
+import {
+  AccountResponseDto,
+  AccountResponseDtoArray,
+} from '../dto/response/account.dto';
 
 export class AccountMapper {
   /**

@@ -1055,9 +1055,13 @@ export class MembersService implements IMembersService {
       throw new NotFoundException('Member not found');
     }
 
+    const media = await this.mediaService.getMediaByOwners([id], 'Member');
+    console.log('Media:', media);
+
     // Chuyển đổi sang DTO
     const memberDTO = MemberDTO.map(member);
-
+    memberDTO.media =
+      media.filter((item) => item.ownerId === memberDTO.memberId) || [];
     // Lấy danh sách thành viên (chỉ 1 người)
     const memberIds = [memberDTO.memberId];
 
@@ -1079,6 +1083,56 @@ export class MembersService implements IMembersService {
     return memberDTO;
   }
 
+  async searchAccountWithMemberId(familyId: string): Promise<MemberDTO[]> {
+    const members =
+      await this.membersRepository.findMembersByFamilyIds(familyId);
+
+    const memberIds = members.map((member) => member._id);
+    // console.log('members:', members);
+    const data = await this.accountsService.getAccountByListMemberId(
+      memberIds.map((id) => id.toString()),
+    );
+    function formatMemberAccountData(members, accounts) {
+      // Create a map of memberId to member for quick lookup
+      const memberMap = new Map();
+      members.forEach((member) => {
+        memberMap.set(member._id.toString(), member);
+      });
+
+      // Format each account with its corresponding member data
+      return accounts
+        .map((account) => {
+          const memberId = account.memberId;
+          const member = memberMap.get(memberId);
+
+          if (!member) return null; // Skip if no matching member
+
+          return {
+            fullName:
+              `${member.firstName} ${member.middleName} ${member.lastName}`.trim(),
+            username: account.username,
+            password: '123456',
+            gender: member.gender,
+            generation: member.generation,
+            dateOfBirth: new Date(member.dateOfBirth)
+              .toISOString()
+              .split('T')[0],
+            dateOfDeath: member.isAlive
+              ? null
+              : new Date(member.dateOfDeath).toISOString().split('T')[0],
+            placeOfDeath: member.placeOfDeath || '',
+            placeOfBirth: member.placeOfBirth || '',
+          };
+        })
+        .filter((item) => item !== null);
+    }
+    // console.log('data:', data);
+
+    const formattedData = formatMemberAccountData(members, data);
+    // console.log('formattedData:', formattedData);
+    return formattedData;
+    // return members.map((member) => MemberDTO.map(member));
+  }
   async searchMembersWithoutPagination(
     familyId: string,
     searchDto: SearchMemberDto,

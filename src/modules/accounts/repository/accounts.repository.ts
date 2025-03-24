@@ -49,6 +49,16 @@ export class AccountsRepository {
       .findOne({ memberId: new mongoose.Types.ObjectId(memberId) })
       .exec();
   }
+  async findByMemberListId(memberIds: string[]): Promise<Account[] | null> {
+    const memberIdsObject = memberIds.map(
+      (id) => new mongoose.Types.ObjectId(id),
+    );
+    const accounts = await this.accountModel
+      .find({ memberId: { $in: memberIdsObject }, role: 'family_member' })
+      .exec();
+    // console.log('Accounts: ', accounts);
+    return accounts;
+  }
 
   /**
    * Finds an account by its `username`.
