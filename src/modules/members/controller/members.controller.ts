@@ -7,12 +7,16 @@ import {
   Param,
   Delete,
   UseInterceptors,
-  ClassSerializerInterceptor, UseGuards,
+  ClassSerializerInterceptor,
+  UseGuards,
   Request,
   Query,
   Put,
   UploadedFile,
-  BadRequestException, UploadedFiles, ParseFilePipeBuilder, HttpStatus,
+  BadRequestException,
+  UploadedFiles,
+  ParseFilePipeBuilder,
+  HttpStatus,
 } from '@nestjs/common';
 import { MembersService } from '../service/members.service';
 import { CreateMemberDto } from '../dto/request/create-member.dto';
@@ -25,40 +29,72 @@ import { LoggingInterceptor } from 'src/common/interceptors/logging.interceptor'
 import { JwtAuthGuard } from '../../auth/guard/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guard/roles.guard';
 import { Roles } from '../../auth/decorator/roles.decorator';
-import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
+import {
+  FileFieldsInterceptor,
+  FileInterceptor,
+} from '@nestjs/platform-express';
 import { MulterFile } from 'src/common/types/multer-file.type';
 import { FaceDetectionService } from 'src/modules/ai-face-detection/service/face-detection.service';
 import { PaginationDTO } from '../../../utils/pagination.dto';
 import { SearchMemberDto } from '../dto/request/search-member.dto';
+// Adjust the path if necessary
 import { winstonLogger as logger } from 'src/common/winston-logger';
+import { console } from 'inspector';
+import { AccountsService } from 'src/modules/accounts/service/accounts.service';
+import { UpdateAccountDto } from 'src/modules/accounts/dto/request/update-account.dto';
 
 @Controller('members')
 @UseInterceptors(ClassSerializerInterceptor, LoggingInterceptor) // Enable auto-serialization
 export class MembersController {
-  constructor(private readonly membersService: MembersService,private readonly faceDetectionService: FaceDetectionService) {}
+  constructor(
+    private readonly membersService: MembersService,
+    private readonly accountsService: AccountsService,
+    private readonly faceDetectionService: FaceDetectionService,
+  ) {}
 
   @Post()
   @UseInterceptors(FileFieldsInterceptor([{ name: 'files', maxCount: 10 }]))
   async create(
     @Body() createMemberDto: CreateMemberDto,
     @UploadedFiles(
-      new ParseFilePipeBuilder()
-        .build({
-          errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
-          fileIsRequired: false, // Files are optional
-        })
-    ) files: { files?: MulterFile[] }
+      new ParseFilePipeBuilder().build({
+        errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+        fileIsRequired: false, // Files are optional
+      }),
+    )
+    files: { files?: MulterFile[] },
   ): Promise<ResponseDTO<MemberDTO>> {
-    const result = await this.membersService.createRootMember(createMemberDto, files?.files || []);
+    const result = await this.membersService.createRootMember(
+      createMemberDto,
+      files?.files || [],
+    );
     return ResponseDTO.success(result, 'Member created successfully');
   }
 
   @Get('family/:familyId/search')
   async searchMembers(
     @Param('familyId') familyId: string,
-    @Query() searchDto: SearchMemberDto): Promise<ResponseDTO<PaginationDTO<MemberDTO>>> {
-    logger.http(`Received GET request to search members for Family ID: ${familyId}`);
-    const result = await this.membersService.searchMembers(familyId,searchDto);
+    @Query() searchDto: SearchMemberDto,
+  ): Promise<ResponseDTO<PaginationDTO<MemberDTO>>> {
+    logger.http(
+      `Received GET request to search members for Family ID: ${familyId}`,
+    );
+    const result = await this.membersService.searchMembers(familyId, searchDto);
+    return ResponseDTO.success(result, 'Members retrieved successfully');
+  }
+
+  @Get('family/:familyId/search/all')
+  async searchAllMembers(
+    @Param('familyId') familyId: string,
+    @Query() searchDto: SearchMemberDto,
+  ): Promise<ResponseDTO<MemberDTO[]>> {
+    logger.http(
+      `Received GET request to search members for Family ID: ${familyId}`,
+    );
+    const result = await this.membersService.searchMembersWithoutPagination(
+      familyId,
+      searchDto,
+    );
     return ResponseDTO.success(result, 'Members retrieved successfully');
   }
 
@@ -80,14 +116,18 @@ export class MembersController {
     @Param('id') id: string,
     @Body() updateMemberDto: UpdateMemberDto,
     @UploadedFiles(
-      new ParseFilePipeBuilder()
-        .build({
-          errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
-          fileIsRequired: false, // Files are optional
-        })
-    ) files: { files?: MulterFile[] }
+      new ParseFilePipeBuilder().build({
+        errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+        fileIsRequired: false, // Files are optional
+      }),
+    )
+    files: { files?: MulterFile[] },
   ): Promise<ResponseDTO<MemberDTO>> {
-    const result = await this.membersService.updateMember(id, updateMemberDto, files?.files || []);
+    const result = await this.membersService.updateMember(
+      id,
+      updateMemberDto,
+      files?.files || [],
+    );
     return ResponseDTO.success(result, 'Member updated successfully');
   }
 
@@ -112,14 +152,17 @@ export class MembersController {
   async createSpouse(
     @Body() createSpouseDto: CreateSpouseDto,
     @UploadedFiles(
-      new ParseFilePipeBuilder()
-        .build({
-          errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
-          fileIsRequired: false, // Files are optional
-        })
-    ) files: { files?: MulterFile[] }
-    ): Promise<ResponseDTO<MemberDTO | null>> {
-    const result = await this.membersService.createSpouse(createSpouseDto, files?.files || []);
+      new ParseFilePipeBuilder().build({
+        errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+        fileIsRequired: false, // Files are optional
+      }),
+    )
+    files: { files?: MulterFile[] },
+  ): Promise<ResponseDTO<MemberDTO | null>> {
+    const result = await this.membersService.createSpouse(
+      createSpouseDto,
+      files?.files || [],
+    );
     return ResponseDTO.success(result, 'Spouse created successfully');
   }
 
@@ -128,14 +171,17 @@ export class MembersController {
   async createChild(
     @Body() createChildDto: CreateChildDto,
     @UploadedFiles(
-      new ParseFilePipeBuilder()
-        .build({
-          errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
-          fileIsRequired: false, // Files are optional
-        })
-    ) files: { files?: MulterFile[] }
+      new ParseFilePipeBuilder().build({
+        errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+        fileIsRequired: false, // Files are optional
+      }),
+    )
+    files: { files?: MulterFile[] },
   ): Promise<ResponseDTO<MemberDTO | null>> {
-    const result = await this.membersService.createChild(createChildDto, files?.files || []);
+    const result = await this.membersService.createChild(
+      createChildDto,
+      files?.files || [],
+    );
     return ResponseDTO.success(result, 'Child created successfully');
   }
 
@@ -143,20 +189,36 @@ export class MembersController {
   @UseInterceptors(FileFieldsInterceptor([{ name: 'files', maxCount: 10 }]))
   async createFamilyLeader(
     @Body() createMemberDto: CreateMemberDto,
+    @Body('username') username: string,
     @UploadedFiles(
-      new ParseFilePipeBuilder()
-        .build({
-          errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
-          fileIsRequired: false, // Files are optional
-        })
-    ) files: { files?: MulterFile[] }
-    ): Promise<ResponseDTO<MemberDTO>> {
-    const result = await this.membersService.createFamilyLeader(createMemberDto, files?.files || []);
+      new ParseFilePipeBuilder().build({
+        errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+        fileIsRequired: false, // Files are optional
+      }),
+    )
+    files: { files?: MulterFile[] },
+  ): Promise<ResponseDTO<MemberDTO>> {
+    const result = await this.membersService.createFamilyLeader(
+      createMemberDto,
+      files?.files || [],
+    );
+
+    const account = await this.accountsService.getAccountByUsername(username);
+    const updateAccountDto: UpdateAccountDto = {
+      accountId: account.accountId,
+      memberId: result.memberId,
+    }; // Adjust properties as per UpdateAccountDto definition
+    await this.accountsService.updateAccount(
+      updateAccountDto.accountId,
+      updateAccountDto,
+    ); // Pass the correct object
     return ResponseDTO.success(result, 'Family leader created successfully');
   }
 
   @Get('/get-member-details/:id')
-  async getMemberDetails(@Param('id') id: string): Promise<ResponseDTO<MemberDTO>> {
+  async getMemberDetails(
+    @Param('id') id: string,
+  ): Promise<ResponseDTO<MemberDTO>> {
     const result = await this.membersService.getMemberDetails(id);
     return ResponseDTO.success(result, 'Member retrieved successfully');
   }

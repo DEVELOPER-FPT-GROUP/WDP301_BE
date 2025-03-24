@@ -19,7 +19,7 @@ import { MediaModule } from '../media/media.module';
     MarriagesModule,
     ParentChildRelationshipsModule,
     RelationshipTypesModule,
-    AccountsModule,
+    forwardRef(() => AccountsModule),
     MediaModule
   ],
   controllers: [MembersController],

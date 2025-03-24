@@ -165,24 +165,24 @@ export class FamilyHistoryRecordService implements IFamilyHistoryRecordService {
 
   async deleteRecord(id: string): Promise<FamilyHistoryRecordResponseDto> {
     logger.http(`Received request to delete family history record with ID: ${id}`);
-  
+
     // Fetch associated media
     const mediaList = await this.mediaService.getMediaByOwners([id], 'FamilyHistory');
     const mediaIds = mediaList.map(media => media.mediaId);
-  
+
     // Delete all associated media
     if (mediaIds.length > 0) {
       await this.mediaService.deleteMultipleMedia(mediaIds);
       logger.info(`Deleted ${mediaIds.length} media files associated with Family History Record ID: ${id}`);
     }
-  
+
     // Delete the record
     const deletedRecord = await this.recordRepository.delete(id);
     if (!deletedRecord) {
       logger.error(`Family History Record with ID: ${id} not found for deletion`);
       throw new NotFoundException(`Family History Record with id ${id} not found`);
     }
-  
+
     logger.info(`Family History Record deleted successfully with ID: ${id}`);
     return FamilyHistoryRecordMapper.toResponseDto(deletedRecord);
   }
@@ -219,5 +219,49 @@ export class FamilyHistoryRecordService implements IFamilyHistoryRecordService {
     );
   }
 
+  async searchRecordsByFamilyIdWithoutPagination(
+    familyId: string,
+    searchDto: SearchFamilyHistoryRecordDto
+  ): Promise<FamilyHistoryRecordResponseDto[]> {
+    const { search, sortByStartDate } = searchDto;
 
+    const filters: any = { familyId };
+
+    if (search) {
+      const regex = new RegExp(search, 'i');
+      filters.$or = [
+        { historicalRecordTitle: regex },
+      ];
+    }
+
+    const sortOptions = sortByStartDate ? { startDate: 1 } : { createdAt: -1 };
+
+    const records = await this.recordRepository.findByFamilyIdWithoutPagination(
+      filters,
+      sortOptions
+    );
+
+    if (!records || records.length === 0) return [];
+
+    const recordIds = records.map((record) => record.historicalRecordId);
+
+    const mediaList = await this.mediaService.getMediaByOwners(
+      recordIds,
+      'FamilyHistory'
+    );
+
+    const mediaGroupedByRecord = Object.fromEntries(
+      recordIds.map((id) => [
+        id,
+        mediaList.filter((media) => media.ownerId === id)
+      ])
+    );
+
+    return records.map((record) =>
+      FamilyHistoryRecordMapper.toResponseDto(
+        record,
+        mediaGroupedByRecord[record.historicalRecordId] || []
+      )
+    );
+  }
 }

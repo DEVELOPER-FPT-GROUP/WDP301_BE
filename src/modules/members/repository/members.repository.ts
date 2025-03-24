@@ -9,7 +9,7 @@ import { UpdateMemberDto } from '../dto/request/update-member.dto';
 export class MembersRepository {
   constructor(
     @InjectModel(Member.name) private memberModel: Model<MemberDocument>
-  ) {}
+  ) { }
 
   async findById(id: string): Promise<Member | null> {
     return this.memberModel.findOne({ _id: new mongoose.Types.ObjectId(id) }).exec();
@@ -57,6 +57,11 @@ export class MembersRepository {
     ]);
 
     return { members, total };
+  }
+
+  async findWithoutPagination(filters: any) {
+    const members = await this.memberModel.find(filters).exec();
+    return members;
   }
 
   /**

@@ -7,6 +7,10 @@ export class SearchAccountDto {
   search: string;
 
   @IsOptional()
+  @IsString()
+  familyId: string;
+
+  @IsOptional()
   @IsBoolean()
   @Transform(({ value }) => value === 'true') // Chuyển "true" -> true
   isAdmin?: boolean;

@@ -13,6 +13,7 @@ import { TrackingsModule } from '../tracking/tracking.module';
     MongooseModule.forFeature([{ name: Account.name, schema: AccountSchema }]),
     forwardRef(() => FamiliesModule),
     forwardRef(() => TrackingsModule),
+    forwardRef(() => MembersModule),
   ],
   controllers: [AccountsController],
   providers: [AccountsService, AccountsRepository],

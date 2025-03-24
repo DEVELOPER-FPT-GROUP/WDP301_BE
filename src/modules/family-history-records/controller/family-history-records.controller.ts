@@ -136,4 +136,14 @@ export class FamilyHistoryRecordController {
     const result = await this.recordService.searchRecordsByFamilyId(familyId, searchDto);
     return ResponseDTO.success(result, 'Family History Records retrieved successfully');
   }
+
+  @Get('family/:familyId/search/all')
+  async searchRecordsByFamilyIdWithoutPagination(
+    @Param('familyId') familyId: string,
+    @Query() searchDto: SearchFamilyHistoryRecordDto
+  ): Promise<ResponseDTO<FamilyHistoryRecordResponseDto[]>> {
+    logger.http(`Received GET request to search family history records for Family ID: ${familyId}`);
+    const result = await this.recordService.searchRecordsByFamilyIdWithoutPagination(familyId, searchDto);
+    return ResponseDTO.success(result, 'Family History Records retrieved successfully');
+  }
 }

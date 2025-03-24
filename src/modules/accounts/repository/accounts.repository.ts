@@ -7,7 +7,10 @@ import { Role } from '../../../utils/enum';
 
 @Injectable()
 export class AccountsRepository {
-  constructor(@InjectModel(Account.name) private readonly accountModel: Model<AccountDocument>) {}
+  constructor(
+    @InjectModel(Account.name)
+    private readonly accountModel: Model<AccountDocument>,
+  ) {}
 
   /**
    * Creates a new account in the database.
@@ -32,7 +35,6 @@ export class AccountsRepository {
    * @returns The account document or null if not found.
    */
   async findById(id: string): Promise<Account | null> {
-    console.log('Find account by id: ', id);
     const objectId = new mongoose.Types.ObjectId(id);
     return this.accountModel.findOne({ _id: objectId }).exec();
   }
@@ -43,7 +45,9 @@ export class AccountsRepository {
    * @returns The account document or null if not found.
    */
   async findByMemberId(memberId: string): Promise<Account | null> {
-    return this.accountModel.findOne({ memberId: new mongoose.Types.ObjectId(memberId) }).exec();
+    return this.accountModel
+      .findOne({ memberId: new mongoose.Types.ObjectId(memberId) })
+      .exec();
   }
 
   /**
@@ -52,6 +56,7 @@ export class AccountsRepository {
    * @returns The account document or null if not found.
    */
   async findByUsername(username: string): Promise<Account | null> {
+    // console.log('Find account by username: ', username);
     return this.accountModel.findOne({ username }).exec();
   }
 
@@ -70,7 +75,10 @@ export class AccountsRepository {
    * @param updateData - The partial account data to update.
    * @returns The updated account document or null if not found.
    */
-  async update(id: string, updateData: Partial<Account>): Promise<Account | null> {
+  async update(
+    id: string,
+    updateData: Partial<Account>,
+  ): Promise<Account | null> {
     const objectId = new mongoose.Types.ObjectId(id);
     return this.accountModel
       .findOneAndUpdate({ _id: objectId }, updateData, { new: true })
@@ -92,9 +100,15 @@ export class AccountsRepository {
    * @param memberId - The unique member ID.
    * @param refreshToken - The new refresh token, or `null` to remove it.
    */
-  async updateRefreshToken(accountId: string, refreshToken: string | null): Promise<void> {
+  async updateRefreshToken(
+    accountId: string,
+    refreshToken: string | null,
+  ): Promise<void> {
     await this.accountModel
-      .findOneAndUpdate({ _id: new mongoose.Types.ObjectId(accountId) }, { refreshToken })
+      .findOneAndUpdate(
+        { _id: new mongoose.Types.ObjectId(accountId) },
+        { refreshToken },
+      )
       .exec();
   }
 
@@ -107,26 +121,33 @@ export class AccountsRepository {
     return this.accountModel.findOne({ refreshToken }).exec();
   }
 
-  async findByFilters(filters: any, page: number, limit: number): Promise<{ accounts: Account[]; total: number }> {
+  async findByFilters(
+    filters: any,
+    page: number,
+    limit: number,
+  ): Promise<{ accounts: Account[]; total: number }> {
     const skip = (page - 1) * limit;
 
     const [accounts, total] = await Promise.all([
       this.accountModel.find(filters).skip(skip).limit(limit).exec(),
-      this.accountModel.countDocuments(filters).exec()
+      this.accountModel.countDocuments(filters).exec(),
     ]);
 
-    console.log("Accounts: ", accounts);
+    console.log('Accounts: ', accounts);
 
     return { accounts, total };
   }
 
-
-  async findAndCount(filters: any, page: number, limit: number): Promise<{ records: Account[]; total: number }> {
+  async findAndCount(
+    filters: any,
+    page: number,
+    limit: number,
+  ): Promise<{ records: Account[]; total: number }> {
     const skip = (page - 1) * limit;
 
     const [records, total] = await Promise.all([
       this.accountModel.find(filters).skip(skip).limit(limit).exec(),
-      this.accountModel.countDocuments(filters).exec()
+      this.accountModel.countDocuments(filters).exec(),
     ]);
 
     return { records, total };
@@ -143,9 +164,11 @@ export class AccountsRepository {
     const startDate = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0)); // 1st day of the month
     const endDate = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999)); // Last day of the month
     console.log(startDate);
-    return this.accountModel.find({
-      createdAt: { $gte: startDate, $lte: endDate }
-    }).exec();
+    return this.accountModel
+      .find({
+        createdAt: { $gte: startDate, $lte: endDate },
+      })
+      .exec();
   }
 
   async findAdminAccount(): Promise<Account | null> {
