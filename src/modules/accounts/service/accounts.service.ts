@@ -61,7 +61,7 @@ export class AccountsService implements IAccountService {
   ): Promise<PaginationDTO<AccountResponseDto>> {
     const { page = 1, limit = 10, search, isAdmin, familyId } = searchDto;
 
-    const filters: any = {};
+    const filters: any = { role: { $ne: 'system_admin' } };
 
     if (isAdmin !== undefined) {
       filters.isAdmin = isAdmin;

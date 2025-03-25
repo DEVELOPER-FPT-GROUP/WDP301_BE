@@ -4,6 +4,7 @@ import { Model } from 'mongoose';
 import mongoose from 'mongoose';
 import { Account, AccountDocument } from '../schema/account.schema';
 import { Role } from '../../../utils/enum';
+import { console } from 'inspector';
 
 @Injectable()
 export class AccountsRepository {
@@ -154,7 +155,6 @@ export class AccountsRepository {
     limit: number,
   ): Promise<{ records: Account[]; total: number }> {
     const skip = (page - 1) * limit;
-
     const [records, total] = await Promise.all([
       this.accountModel.find(filters).skip(skip).limit(limit).exec(),
       this.accountModel.countDocuments(filters).exec(),
