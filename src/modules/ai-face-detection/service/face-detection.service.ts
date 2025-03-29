@@ -5,7 +5,6 @@ import { winstonLogger as logger } from 'src/common/winston-logger';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs/promises';
-import { v4 as uuidv4 } from 'uuid';
 import { setupTFBackendAndLoadFaceAPI } from 'src/utils/tf-loader';
 
 @Injectable()

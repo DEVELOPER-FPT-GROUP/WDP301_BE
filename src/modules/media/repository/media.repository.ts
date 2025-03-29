@@ -66,4 +66,9 @@ export class MediaRepository {
   ): Promise<void> {
     await this.mediaModel.deleteMany({ ownerType, status }).exec();
   }
+
+  async updateManyByCondition(filter: any, update: any): Promise<void> {
+    await this.mediaModel.updateMany(filter, { $set: update });
+  }
+  
 }

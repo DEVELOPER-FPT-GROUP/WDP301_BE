@@ -17,7 +17,7 @@ import { FaceDetectionService } from 'src/modules/ai-face-detection/service/face
 
 import { FacialSearchService } from 'src/modules/facial-search/service/facial-search.service';
 import { Media } from '../schema/media.schema';
-import * as axios from 'axios';
+import { FaceCacheService } from './face-cache.service';
 @Injectable()
 export class MediaService {
   constructor(
@@ -25,7 +25,8 @@ export class MediaService {
     private readonly cloudinaryService: CloudinaryService,
     private readonly faceDetectionService: FaceDetectionService,
     @Inject(forwardRef(() => FacialSearchService))
-    private readonly facialSearchService: FacialSearchService
+    private readonly facialSearchService: FacialSearchService,
+    private readonly faceCacheService: FaceCacheService
   ) {}
 
   /**
@@ -196,7 +197,7 @@ export class MediaService {
     file: MulterFile,
     ownerId: string,
     ownerType: 'Member'
-  ): Promise<{ faceId: string; previewUrl: string; status: 'unknown' }[]> {
+  ): Promise<{ faceId: string; previewUrl: string; status: 'unknown' }[] | MediaResponseDto> {
     if (!file) {
       throw new BadRequestException('Avatar file is required');
     }
@@ -204,7 +205,7 @@ export class MediaService {
     try {
       logger.http(`Processing avatar for ${ownerType} ID: ${ownerId}`);
   
-      // Detect faces but do not store yet
+      // Detect faces
       const detectedFaces = await this.faceDetectionService.detectAndCropFaces(file);
   
       if (detectedFaces.length === 0) {
@@ -213,7 +214,40 @@ export class MediaService {
   
       logger.info(`✅ Detected ${detectedFaces.length} face(s) for ${ownerType} ID: ${ownerId}`);
   
-      // Temporarily upload each detected face to Cloudinary for preview
+      // ✅ CASE 1: Only one face -> auto save as avatar
+      if (detectedFaces.length === 1) {
+        const singleFace = detectedFaces[0];
+        const newPublicId = `avatar_${ownerId}_${Date.now()}`;
+        const uploadResult = await this.cloudinaryService.uploadFile({
+          ...file,
+          buffer: singleFace.faceBuffer ?? Buffer.alloc(0),
+          mimetype: 'image/png',
+          originalname: `avatar_${newPublicId}.png`,
+        });
+  
+        // ✅ Step 1: Downgrade current avatar(s) of this member to "label"
+        await this.mediaRepository.updateManyByCondition(
+          { ownerId, ownerType: 'Member', status: 'avatar' },
+          { status: 'label' }
+        );
+  
+        // ✅ Step 2: Save new avatar media
+        const mediaEntity = MediaMapper.toEntityFromFile({
+          ownerId,
+          ownerType: 'Member',
+          fileName: `${newPublicId}.png`,
+          mimeType: 'image/png',
+          size: file.size,
+          url: uploadResult.secure_url,
+          status: 'avatar'
+        });
+  
+        const saved = await this.mediaRepository.create(mediaEntity);
+        logger.info(`✅ Automatically saved avatar for ${ownerId} without manual verification`);
+        return MediaMapper.toResponseDto(saved);
+      }
+  
+      // ✅ CASE 2: Multiple faces -> fallback to verification flow
       const tempFaces = await Promise.all(
         detectedFaces.map(async (face, index) => {
           const tempFaceId = `${ownerId}_face_${index}_${Date.now()}`;
@@ -224,10 +258,14 @@ export class MediaService {
             originalname: `temp_avatar_${tempFaceId}.png`,
           });
   
+          if (face.faceBuffer) {
+            this.faceCacheService.set(tempUpload.public_id, face.faceBuffer);
+          }
+  
           return {
             faceId: tempUpload.public_id,
-            previewUrl: tempUpload.secure_url, // Provide preview image URL for frontend verification
-            status: 'unknown' as const, // Default status before user verification
+            previewUrl: tempUpload.secure_url,
+            status: 'unknown' as const,
           };
         })
       );
@@ -238,6 +276,7 @@ export class MediaService {
       throw new BadRequestException(`Failed to detect avatar: ${error.message}`);
     }
   }
+  
   async verifyAndUploadFaces(
     verifiedFaces: { faceId: string; memberId: string; status: 'avatar' | 'label' | 'unknown' }[]
   ): Promise<MediaResponseDto[]> {
@@ -248,114 +287,122 @@ export class MediaService {
     try {
       logger.http(`Finalizing face upload for ${verifiedFaces.length} faces`);
   
-      // First, handle all unknown faces deletion separately
-      const unknownFaces = verifiedFaces.filter(face => face.status === 'unknown');
+      // 1. Xử lý các face "unknown" → xóa luôn
+      const unknownFaces = verifiedFaces
+        .filter(face => face.status === 'unknown')
+        .map(({ faceId, memberId, status }) => ({
+          faceId,
+          memberId,
+          status: status as 'unknown'
+        }));
       if (unknownFaces.length > 0) {
-        await this.deleteUnknownFaces(
-          unknownFaces.map(face => ({ faceId: face.faceId, memberId: face.memberId, status: 'unknown' }))
+        await this.deleteUnknownFaces(unknownFaces);
+      }
+  
+      // 2. Xác định nếu có face nào là avatar → cập nhật duy nhất
+      const avatarFace = verifiedFaces.find(f => f.status === 'avatar');
+      if (avatarFace) {
+        logger.info(`🎯 Avatar selected by user for member ${avatarFace.memberId}`);
+  
+        // Downgrade avatar hiện tại (nếu có) → label
+        await this.mediaRepository.updateManyByCondition(
+          { ownerId: avatarFace.memberId, ownerType: 'Member', status: 'avatar' },
+          { status: 'label' }
         );
       }
   
-      // Get only the faces we want to process further
-      const facesToProcess = verifiedFaces.filter(face => face.status === 'avatar' || face.status === 'label');
+      // 3. Xử lý upload các face được giữ lại
+      const facesToProcess = verifiedFaces.filter(
+        face => face.status === 'avatar' || face.status === 'label'
+      );
+  
       if (facesToProcess.length === 0) {
         logger.info('No avatar or label faces to process');
         return [];
       }
-      
-      // Process all faces first - store results for later
-      const uploadResults: Media[] = [];
-      
-      for (const { faceId, memberId, status } of facesToProcess) {
-        // Retrieve temporary uploaded face file from Cloudinary
-        const tempFile = await this.cloudinaryService.getExistingFile(faceId);
   
-        if (!tempFile) {
-          logger.warn(`Temporary file for face ID ${faceId} not found, skipping`);
-          continue;
-        }
-  
-        try {
-          // Download the image from Cloudinary using axios directly
-          const response = await axios.default.get(tempFile.url, {
-            responseType: 'arraybuffer',
-          });
-          
-          if (response.status !== 200) {
-            logger.warn(`Failed to fetch image for face ID ${faceId}, skipping`);
-            continue;
+      const uploadResults = await Promise.all(
+        facesToProcess.map(async ({ faceId, memberId, status }) => {
+          try {
+            const media = await this.processFaceUpload(faceId, memberId, status);
+            return media;
+          } catch (err) {
+            logger.error(`❌ Error processing face ${faceId}: ${err.message}`);
+            return null;
           }
-          
-          const imageBuffer = Buffer.from(response.data);
+        })
+      );
   
-          // Upload final version to Cloudinary
-          const finalUpload = await this.cloudinaryService.uploadFile({
-            fieldname: 'file',
-            encoding: '7bit',
-            mimetype: 'image/png',
-            buffer: imageBuffer,
-            originalname: `avatar_${memberId}.png`,
-            size: tempFile.size
-          });
+      const successfulUploads = uploadResults.filter((r): r is Media => r !== null);
   
-          // Store in MongoDB
-          const mediaEntity = MediaMapper.toEntityFromFile({
-            ownerId: memberId,
-            ownerType: 'Member',
-            fileName: `avatar_${memberId}.png`,
-            mimeType: 'image/png',
-            size: tempFile.size,
-            url: finalUpload.secure_url,
-            status: status
-          });
+      logger.info(`✅ Finalized ${successfulUploads.length} face(s)`);
   
-          const savedMedia = await this.mediaRepository.create(mediaEntity);
-          uploadResults.push(savedMedia);
-        } catch (error) {
-          logger.error(`Error processing face ID ${faceId}: ${error.message}`);
-          // Continue with next face
-        }
-      }
-  
-      // At this point, face upload is complete regardless of embedding generation
-      logger.info(`✅ Successfully finalized ${uploadResults.length} avatar(s) and labeled face(s)`);
-      
-      // IMPORTANT: Schedule embedding generation to happen outside this function's stack
-      if (uploadResults.length > 0) {
-        const embeddingQueue = uploadResults.map(media => ({
+      // 4. Background embedding
+      if (successfulUploads.length > 0) {
+        const embeddingQueue = successfulUploads.map(media => ({
           mediaId: String(media.mediaId),
-          memberId: String(media.ownerId)
+          memberId: String(media.ownerId),
         }));
-        
-        // Use setTimeout with 0ms delay to push to next event loop iteration
-        setTimeout(() => {
+  
+        setImmediate(() => {
           this.processEmbeddingQueue(embeddingQueue).catch(err => {
-            logger.error(`Background embedding generation failed: ${err.message}`);
+            logger.error(`❌ Background embedding error: ${err.message}`);
           });
-        }, 0);
+        });
       }
   
-      return uploadResults.map(media => MediaMapper.toResponseDto(media));
+      return successfulUploads.map(MediaMapper.toResponseDto);
     } catch (error) {
-      logger.error(`❌ Error finalizing face upload: ${error.message}`);
+      logger.error(`❌ Failed in verifyAndUploadFaces: ${error.message}`);
       throw new BadRequestException(`Failed to finalize face upload: ${error.message}`);
     }
   }
   
-  // New helper method to process embedding queue
-  private async processEmbeddingQueue(queue: { mediaId: string; memberId: string }[]): Promise<void> {
-    for (const { mediaId, memberId } of queue) {
-      try {
-        // Add a slight delay between processing each item to avoid overloading
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        await this.facialSearchService.generateEmbeddingForMember(mediaId, memberId);
-        logger.info(`✅ Successfully generated embedding for media ${mediaId}, member ${memberId}`);
-      } catch (error) {
-        logger.warn(`⚠️ Failed to generate embedding for media ${mediaId}: ${error.message}`);
-      }
+  
+  private async processFaceUpload(
+    faceId: string,
+    memberId: string,
+    status: 'avatar' | 'label' | 'unknown'
+  ): Promise<Media | null> {
+    try {
+      // ✅ Rename ảnh thay vì re-upload
+      const newPublicId = `avatar_${memberId}_${Date.now()}`;
+      await this.cloudinaryService.renameFile(faceId, newPublicId);
+  
+      const finalUrl = this.cloudinaryService.getPublicUrl(newPublicId); // hoặc response.secure_url nếu SDK trả
+  
+      const mediaEntity = MediaMapper.toEntityFromFile({
+        ownerId: memberId,
+        ownerType: 'Member',
+        fileName: `${newPublicId}.png`,
+        mimeType: 'image/png',
+        size: 0, // optional nếu không có metadata
+        url: finalUrl,
+        status
+      });
+  
+      return this.mediaRepository.create(mediaEntity);
+    } catch (err) {
+      logger.error(`❌ Rename failed for face ${faceId}: ${err.message}`);
+      return null;
     }
   }
+  
+  
+  private async processEmbeddingQueue(queue: { mediaId: string; memberId: string }[]): Promise<void> {
+    await Promise.allSettled(
+      queue.map(async ({ mediaId, memberId }) => {
+        try {
+          await new Promise(res => setTimeout(res, 100)); // throttle
+          await this.facialSearchService.generateEmbeddingForMember(mediaId, memberId);
+          logger.info(`✅ Embedded media ${mediaId} for member ${memberId}`);
+        } catch (err) {
+          logger.warn(`⚠️ Embedding failed for ${mediaId}: ${err.message}`);
+        }
+      })
+    );
+  }
+  
 
   
   async deleteUnknownFaces(unknownFaces: { faceId: string; memberId: string; status: 'unknown' }[]): Promise<void> {

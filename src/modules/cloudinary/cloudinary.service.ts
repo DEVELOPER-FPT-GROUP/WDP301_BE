@@ -194,5 +194,21 @@ export class CloudinaryService {
     }
   }
   
+  async renameFile(oldPublicId: string, newPublicId: string): Promise<void> {
+    try {
+      await cloudinary.uploader.rename(oldPublicId, newPublicId, {
+        overwrite: true, // Ghi đè nếu trùng
+      });
+    } catch (error) {
+      throw new Error(`Cloudinary rename failed: ${error.message}`);
+    }
+  }
+
+  getPublicUrl(publicId: string): string {
+    return cloudinary.url(publicId, {
+      secure: true,
+      format: 'png', // hoặc giữ nguyên nếu bạn có định dạng khác
+    });
+  }
 
 }

@@ -47,84 +47,78 @@ export class MembersService implements IMembersService {
     private readonly mediaService: MediaService,
   ) {}
 
-  /**
-   * Creates a new member in the system.
-   * @param createMemberDto - The data transfer object containing member details.
-   * @returns The newly created member as a DTO.
-   */
-  async createMember(
-    createMemberDto: CreateMemberDto,
-    files: MulterFile[],
-  ): Promise<MemberDTO> {
-    // console.log('createMemberDto:', createMemberDto);
-    const createdMember = await this.membersRepository.create(createMemberDto);
 
-    console.log('files: ', files);
-    let detectedFaces: {
-      faceId: string;
-      previewUrl: string;
-      status: 'unknown';
-    }[] = [];
+ /**
+ * Handle avatar processing for a newly created member.
+ * Returns either MediaResponseDto (auto avatar) or list of face previews for manual verification.
+ */
+ async handleAvatarUploadForMember(
+  file: MulterFile,
+  memberId: string
+): Promise<MediaResponseDto | { faceId: string; previewUrl: string; status: 'unknown' }[]> {
+  return this.mediaService.processAndUploadAvatar(file, memberId, 'Member');
+}
 
-    if (files && files.length > 0) {
-      detectedFaces = await this.mediaService.processAndUploadAvatar(
-        files[0],
-        String(createdMember._id),
-        'Member',
-      );
-    }
 
-    // Return member info along with detected face previews for verification
-    const memberDTO = MemberDTO.map(createdMember);
-    memberDTO.media = detectedFaces; // Attach preview images for verification
 
-    return memberDTO;
+async createMember(
+  createMemberDto: CreateMemberDto,
+  files: MulterFile[],
+): Promise<MemberDTO> {
+  const createdMember = await this.membersRepository.create(createMemberDto);
+
+  let media: MediaResponseDto | { faceId: string; previewUrl: string; status: 'unknown' }[] = [];
+
+  if (files && files.length > 0) {
+    media = await this.handleAvatarUploadForMember(
+      files[0],
+      String(createdMember._id),
+    );
   }
 
-  async createRootMember(
-    createMemberDto: CreateMemberDto,
-    files: MulterFile[],
-  ): Promise<MemberDTO> {
-    console.log('createMemberDto:', createMemberDto);
-    const createdMember = await this.membersRepository.create(createMemberDto);
+  const memberDTO = MemberDTO.map(createdMember);
+  memberDTO.media = Array.isArray(media) ? media : [media];
 
-    console.log('files: ', files);
-    let detectedFaces: {
-      faceId: string;
-      previewUrl: string;
-      status: 'unknown';
-    }[] = [];
+  return memberDTO;
+}
 
-    if (files && files.length > 0) {
-      detectedFaces = await this.mediaService.processAndUploadAvatar(
-        files[0],
-        String(createdMember._id),
-        'Member',
-      );
-    }
 
-    // Create an account for the member if they are alive
-    if (createdMember.isAlive) {
-      const createAccountDto = Object.assign(new CreateAccountDto(), {
-        memberId: String(createdMember._id),
-        // Generates a unique username based on the child's name
-        username: DataUtils.generateUniqueUsername(
-          createdMember.firstName,
-          createdMember.middleName || '',
-          createdMember.lastName,
-        ),
-        passwordHash: '123456', // Default password (should be securely managed)
-        role: Role.FAMILY_MEMBER,
-      });
-      await this.accountsService.createAccount(createAccountDto);
-    }
+async createRootMember(
+  createMemberDto: CreateMemberDto,
+  files: MulterFile[],
+): Promise<MemberDTO> {
+  const createdMember = await this.membersRepository.create(createMemberDto);
 
-    // Return member info along with detected face previews for verification
-    const memberDTO = MemberDTO.map(createdMember);
-    memberDTO.media = detectedFaces; // Attach preview images for verification
+  let media: MediaResponseDto | { faceId: string; previewUrl: string; status: 'unknown' }[] = [];
 
-    return memberDTO;
+  if (files && files.length > 0) {
+    media = await this.handleAvatarUploadForMember(
+      files[0],
+      String(createdMember._id),
+    );
   }
+
+  if (createdMember.isAlive) {
+    const createAccountDto = Object.assign(new CreateAccountDto(), {
+      memberId: String(createdMember._id),
+      username: DataUtils.generateUniqueUsername(
+        createdMember.firstName,
+        createdMember.middleName || '',
+        createdMember.lastName,
+      ),
+      passwordHash: '123456',
+      role: Role.FAMILY_MEMBER,
+    });
+    await this.accountsService.createAccount(createAccountDto);
+  }
+
+  const memberDTO = MemberDTO.map(createdMember);
+  memberDTO.media = Array.isArray(media) ? media : [media];
+
+  return memberDTO;
+}
+
+  
 
   /**
    * Retrieves a member by their unique ID.

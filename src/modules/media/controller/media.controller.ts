@@ -83,10 +83,12 @@ export class MediaController {
     if (!body.verifiedFaces || !Array.isArray(body.verifiedFaces) || body.verifiedFaces.length === 0) {
       throw new BadRequestException('Invalid request: verifiedFaces must be a non-empty array.');
     }
-  
+
     logger.http(`📥 Received verified faces: ${JSON.stringify(body.verifiedFaces)}`);
-  
+
+    // ✅ API sẽ trả về sau khi upload thành công, embedding xử lý ngầm
     return await this.mediaService.verifyAndUploadFaces(body.verifiedFaces);
   }
+
   
 }

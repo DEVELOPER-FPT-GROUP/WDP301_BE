@@ -21,16 +21,19 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     }
 
     async validate(payload: any) {
-        if (!payload?.sub || !payload?.username) {
+        console.log(payload);
+        if (!payload?.username) {
             throw new UnauthorizedException('Invalid Token');
         }
 
         // Fetch the account from the database using the memberId (sub)
-        const account = await this.accountsRepository.findByMemberId(payload.sub);
-        if (!account || account.username !== payload.username) {
-            throw new UnauthorizedException('Invalid Token');
+        if(payload.username) {
+            const account = await this.accountsRepository.findByUsername(payload.username);
+            if(!account) {
+                throw new UnauthorizedException('Invalid Token');
+            }
+            return AccountMapper.toResponseDto(account);
         }
-
-        return AccountMapper.toResponseDto(account);
+        return null;
     }
 }

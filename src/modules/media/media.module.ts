@@ -11,6 +11,7 @@ import { MulterModule } from '@nestjs/platform-express';
 import { FaceDetectionProvider } from '../ai-face-detection/providers/face-detection.provider';
 import { FaceDetectionService } from '../ai-face-detection/service/face-detection.service';
 import { FacialSearchModule } from '../facial-search/facial-search.module';
+import { FaceCacheService } from './serivce/face-cache.service';
 
 @Module({
   imports: [
@@ -25,7 +26,7 @@ import { FacialSearchModule } from '../facial-search/facial-search.module';
     forwardRef(() => FacialSearchModule)
   ],
   controllers: [MediaController], // ✅ Connect Controller
-  providers: [MediaService, MediaRepository, CloudinaryProvider, CloudinaryService,FaceDetectionProvider, FaceDetectionService],  // ✅ Register Service & Repository
+  providers: [MediaService, MediaRepository, CloudinaryProvider, CloudinaryService,FaceDetectionProvider, FaceDetectionService,FaceCacheService],  // ✅ Register Service & Repository
   exports: [MediaService, MediaRepository], // ✅ Allow reusability in other modules
 })
 export class MediaModule {}

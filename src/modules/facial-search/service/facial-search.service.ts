@@ -9,22 +9,9 @@ import { MediaRepository } from 'src/modules/media/repository/media.repository';
 import { MemberDTO } from 'src/modules/members/dto/response/member.dto';
 import { ConversionUtil } from 'src/utils/conversion.util';
 import * as axios from 'axios';
+import { FacialSearchOptions } from '../dto/request/facial-search-options.dto';
+import { FacialSearchResult } from '../dto/response/facical-search-response.dto';
 
-export interface FacialSearchResult {
-  memberId: string;
-  similarity: number;
-  memberDetails?: MemberDTO;
-  confidenceLevel?: 'high' | 'medium' | 'low';
-}
-
-export interface FacialSearchOptions {
-  similarityThreshold?: number;
-  maxResults?: number;
-  includeDetails?: boolean;
-  filterGender?: string;
-  filterAgeRange?: [number, number];
-  sortBy?: 'similarity' | 'recent' | 'name';
-}
 
 @Injectable()
 export class FacialSearchService {
