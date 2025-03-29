@@ -5,6 +5,7 @@ import { RefreshTokenDto } from '../dto/request/refreshToken.dto';
 import { LogoutDto } from '../dto/request/logout.dto';
 import { RegisterDto } from '../dto/request/register.dto';
 import { MemberDTO } from '../../members/dto/response/member.dto';
+import { JwtPayload } from '../../notifications/notifications.gateway';
 
 export interface IAuthService {
   /**
@@ -36,4 +37,6 @@ export interface IAuthService {
   logout(logoutDto: LogoutDto): Promise<void>;
 
   register(registerDto: RegisterDto): Promise<void>;
+
+  verifyJwt(token: string): JwtPayload;
 }

@@ -7,4 +7,5 @@ export class AccountResponseDto {
   isAdmin: boolean;
   createdAt: Date;
   updatedAt: Date;
+  role: string;
 }

@@ -50,7 +50,7 @@ import { NotificationModule } from './modules/notifications/notifications.module
     TrackingsModule,
     BranchModule,
     HouseholdModule,
-    NotificationModule
+    NotificationModule,
   ],
 })
 export class AppModule {}

@@ -953,4 +953,46 @@ export class MembersService implements IMembersService {
     return MemberDTO.map(result);
   }
 
+  async getConnectedMembersFrom(memberId: string): Promise<MemberDTO[]> {
+    if (!memberId) {
+      throw new Error('Member ID must be provided');
+    }
+
+    const visited = new Set<string>();
+    const result: MemberDTO[] = [];
+
+    const dfs = async (currentId: string): Promise<void> => {
+      if (visited.has(currentId)) return;
+      visited.add(currentId);
+
+      const member = await this.getMemberById(currentId);
+      if (!member) return;
+
+      result.push(member);
+
+      // 🔹 Traverse spouses
+      const marriages = await this.marriagesService.getAllSpouses([currentId]);
+      const spouseIds = marriages.map(marriage =>
+        marriage.husbandId === currentId ? marriage.wifeId : marriage.husbandId
+      );
+
+      // 🔹 Traverse children
+      const childrenRelations = await this.parentChildRelationshipsService.findByParentIds([currentId]);
+      const childIds = childrenRelations.map(rel => rel.childId);
+
+      // 🔁 Combine all next IDs (spouses + children)
+      const nextIds = [...spouseIds, ...childIds];
+
+      // 🔁 DFS for unvisited connections (sequential)
+      for (const nextId of nextIds) {
+        if (nextId && !visited.has(nextId)) {
+          await dfs(nextId);
+        }
+      }
+    };
+
+    await dfs(memberId);
+
+    return result;
+  }
 }

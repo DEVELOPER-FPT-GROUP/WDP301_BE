@@ -32,6 +32,7 @@ export class AccountMapper {
     if (dto.passwordHash) updateData.passwordHash = dto.passwordHash;
     if (dto.email) updateData.email = dto.email;
     if (typeof dto.isAdmin !== 'undefined') updateData.isAdmin = dto.isAdmin;
+    if (dto.role) updateData.role = dto.role;
 
     updateData.updatedAt = new Date();
     return updateData;
@@ -50,6 +51,7 @@ export class AccountMapper {
       isAdmin: account.isAdmin,
       createdAt: account.createdAt,
       updatedAt: account.updatedAt,
+      role: account.role,
     };
   }
 }

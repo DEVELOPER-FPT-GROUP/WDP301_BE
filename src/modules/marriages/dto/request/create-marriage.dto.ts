@@ -20,4 +20,7 @@ export class CreateMarriageDto {
   @IsOptional()
   @IsDateString()
   divorcedDate?: Date;
+
+  @IsString()
+  createdByMemberId: string; // ✅ NEW FIELD
 }

@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors
+  Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, UseGuards,
 } from '@nestjs/common';
 import { NotificationsService } from '../service/notifications.service';
 import { CreateNotificationDto } from '../dto/request/create-notification.dto';
@@ -8,6 +8,9 @@ import { LoggingInterceptor } from 'src/common/interceptors/logging.interceptor'
 import { winstonLogger as logger } from 'src/common/winston-logger';
 import { ResponseDTO } from 'src/utils/response.dto';
 import { NotificationResponseDto } from '../dto/response/notification-response.dto';
+import { Roles } from '../../auth/decorator/roles.decorator';
+import { Role } from '../../../utils/enum';
+import { JwtAuthGuard } from '../../auth/guard/jwt-auth.guard';
 
 @UseInterceptors(LoggingInterceptor)
 @Controller('notifications')
@@ -17,6 +20,7 @@ export class NotificationsController {
   /**
    * Create a new notification
    */
+  @UseGuards(JwtAuthGuard)
   @Post()
   async createNotification(
     @Body() createNotificationDto: CreateNotificationDto

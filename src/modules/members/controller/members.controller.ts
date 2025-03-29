@@ -62,6 +62,14 @@ export class MembersController {
     return ResponseDTO.success(result, 'Members retrieved successfully');
   }
 
+  @Get('/traversal/:memberId')
+  async getMembersByHouseholdId(
+    @Param('memberId') memberId: string,
+  ): Promise<ResponseDTO<MemberDTO[]>> {
+    const result = await this.membersService.getConnectedMembersFrom(memberId);
+    return ResponseDTO.success(result, 'Members in household retrieved successfully');
+  }
+
   @Get()
   async findAll(): Promise<ResponseDTO<MemberDTO[]>> {
     const result = await this.membersService.findAllMembers();

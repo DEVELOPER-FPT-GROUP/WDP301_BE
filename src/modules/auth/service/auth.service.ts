@@ -24,6 +24,7 @@ import { AccountsService } from '../../accounts/service/accounts.service';
 import { CreateAccountDto } from '../../accounts/dto/request/create-account.dto';
 import { Role } from '../../../utils/enum';
 import { FamiliesRepository } from '../../families/repository/families.repository';
+import { JwtPayload } from '../../notifications/notifications.gateway';
 
 @Injectable()
 export class AuthService implements IAuthService {
@@ -163,5 +164,25 @@ export class AuthService implements IAuthService {
     };
 
     await this.familiesService.createFamily(createFamilyDto);
+  }
+
+  verifyJwt(token: string): JwtPayload {
+    try {
+      // Verify the token and get the payload
+      const payload = this.jwtService.verify<JwtPayload>(token);
+
+      return payload;
+    } catch (error) {
+      // Handle different types of JWT verification errors
+      if (error.name === 'TokenExpiredError') {
+        throw new UnauthorizedException('Token has expired');
+      }
+      if (error.name === 'JsonWebTokenError') {
+        throw new UnauthorizedException('Invalid token');
+      }
+
+      // Generic catch-all for other verification errors
+      throw new UnauthorizedException('Authentication failed');
+    }
   }
 }

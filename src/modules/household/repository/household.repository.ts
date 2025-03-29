@@ -35,4 +35,9 @@ export class HouseholdRepository {
   async findByBranchId(branchId: string): Promise<Household[]> {
     return this.model.find({ branchId: new mongoose.Types.ObjectId(branchId) }).exec();
   }
+
+  async findByHeadAccountId(headAccountId: string): Promise<Household | null> {
+    return this.model.findOne({ headAccountId: new mongoose.Types.ObjectId(headAccountId) }).exec();
+  }
+
 }

@@ -14,8 +14,8 @@ export class CreateNotificationDto {
   @IsNotEmpty()
   message: string;
 
+  @IsOptional()
   @IsArray()
-  @IsNotEmpty()
   recipientAccountIds: string[]; // List of recipients
 
   @IsOptional()

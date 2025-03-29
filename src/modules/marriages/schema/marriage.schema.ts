@@ -11,6 +11,9 @@ export class Marriage {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Member' })
   husbandId: MongooseSchema.Types.ObjectId; // Foreign Key referencing Husband (Member)
 
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Member' })
+  createdByMemberId: MongooseSchema.Types.ObjectId; // ✅ Member who created this marriage
+
   @Prop({ default: false })
   isDivorced: boolean;
 

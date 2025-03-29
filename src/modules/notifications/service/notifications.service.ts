@@ -5,15 +5,24 @@ import { CreateNotificationDto } from '../dto/request/create-notification.dto';
 import { NotificationMapper } from '../mapper/notification.mapper';
 import { NotificationResponseDto } from '../dto/response/notification-response.dto';
 import { SendVia } from '../../../utils/enum';
+import { MembersService } from '../../members/service/members.service';
 
 @Injectable()
 export class NotificationsService {
   constructor(
     private readonly notificationRepository: NotificationsRepository,
-    private readonly notificationRecipientRepository: NotificationRecipientRepository
-  ) {}
+    private readonly notificationRecipientRepository: NotificationRecipientRepository,
+    private readonly membersService: MembersService,
+  ) { }
 
   async create(data: CreateNotificationDto): Promise<NotificationResponseDto> {
+    let memberIds =
+      (await this.membersService
+        .getConnectedMembersFrom(data.senderId))
+        .map(m => {
+          return m.memberId;
+        });
+
     const notification = await this.notificationRepository.create({
       eventId: data.eventId,
       senderId: data.senderId,
@@ -23,7 +32,7 @@ export class NotificationsService {
       expirationTime: data.expirationTime,
     });
 
-    for (const recipientId of data.recipientAccountIds) {
+    for (const recipientId of memberIds) {
       await this.notificationRecipientRepository.create({
         notificationId: notification.notificationId,
         recipientAccountId: recipientId,
@@ -32,7 +41,10 @@ export class NotificationsService {
       });
     }
 
-    return NotificationMapper.toResponseDto(notification);
+    // Broadcast the notification to all recipients via WebSocket
+    const notificationResponse = NotificationMapper.toResponseDto(notification);
+
+    return notificationResponse;
   }
 
   async getNotificationsByEvent(eventId: string): Promise<NotificationResponseDto[]> {
@@ -45,6 +57,8 @@ export class NotificationsService {
 
   async markNotificationAsRead(recipientId: string): Promise<void> {
     await this.notificationRecipientRepository.markAsRead(recipientId);
+    // You could also broadcast this status change to relevant clients if needed
+    // this.notificationsGateway.broadcastNotification([recipientId], { type: 'READ_STATUS_CHANGED', recipientId });
   }
 
   async findAll(): Promise<NotificationResponseDto[]> {

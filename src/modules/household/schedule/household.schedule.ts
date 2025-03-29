@@ -74,7 +74,10 @@ export class HouseholdJobService {
         // ✅ Optionally update account role to FAMILY_BRANCH
         let acc = await  this.accountsService.getAccountByMemberId(creatorId);
         if(acc) {
-          let account = await this.accountsService.updateAccountRole(acc?.accountId, Role.FAMILY_HOUSEHOLD);
+          let account = await this.accountsService.updateAccount(acc?.accountId, {
+            ...acc,
+            role: Role.FAMILY_HOUSEHOLD
+          });
           console.log("Account: ", account);
         }
 

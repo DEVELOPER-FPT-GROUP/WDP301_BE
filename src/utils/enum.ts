@@ -7,6 +7,8 @@ export enum Role {
   SYSTEM_ADMIN = 'system_admin',
   FAMILY_LEADER = 'family_leader',
   FAMILY_MEMBER = 'family_member',
+  FAMILY_HOUSEHOLD = 'family_household',
+  FAMILY_BRANCH = 'family_branch',
 }
 
 export enum NotificationType {

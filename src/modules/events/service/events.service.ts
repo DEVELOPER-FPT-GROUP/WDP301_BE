@@ -9,7 +9,7 @@ import { MediaResponseDto } from 'src/modules/media/dto/response/media-response.
 import { EventMapper } from '../mapper/events.mapper';
 import { winstonLogger as logger } from 'src/common/winston-logger';
 import { MediaService } from 'src/modules/media/serivce/media.service';
-import { UserRole } from 'src/modules/auth/guard/roles.guard';
+import { Role } from '../../../utils/enum';
 
 
 @Injectable()
@@ -35,7 +35,7 @@ export class EventsService implements IEventService {
     logger.http('Received request to create a new event');
 
     // Prevent Super Admin from creating events
-    if (user.role === UserRole.SUPER_ADMIN) {
+    if (user.role === Role.SYSTEM_ADMIN) {
       throw new ForbiddenException('Super Admin is not allowed to create events.');
     }
 
@@ -57,7 +57,7 @@ export class EventsService implements IEventService {
     logger.http(`Received request to update event with ID: ${id}`);
 
     // Prevent Super Admin from updating events
-    if (user.role === UserRole.SUPER_ADMIN) {
+    if (user.role === Role.SYSTEM_ADMIN) {
       throw new ForbiddenException('Super Admin is not allowed to update events.');
     }
 
@@ -126,7 +126,7 @@ export class EventsService implements IEventService {
     logger.http(`Received request to delete event with ID: ${id}`);
 
     // Prevent Super Admin from deleting events
-    if (user.role === UserRole.SUPER_ADMIN) {
+    if (user.role === Role.SYSTEM_ADMIN) {
       throw new ForbiddenException('Super Admin is not allowed to delete events.');
     }
 

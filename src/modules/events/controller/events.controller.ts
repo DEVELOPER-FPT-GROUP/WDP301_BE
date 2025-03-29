@@ -14,8 +14,9 @@ import { EventResponse } from '../dto/response/events.dto';
 import { winstonLogger as logger } from 'src/common/winston-logger';
 import { ResponseDTO } from 'src/utils/response.dto';
 import { JwtAuthGuard } from 'src/modules/auth/guard/jwt-auth.guard';
-import { RolesGuard, UserRole } from 'src/modules/auth/guard/roles.guard';
+import { RolesGuard } from 'src/modules/auth/guard/roles.guard';
 import { Roles } from 'src/modules/auth/decorator/roles.decorator';
+import { Role } from '../../../utils/enum';
 
 @Controller('events')
 @UseInterceptors(LoggingInterceptor)
@@ -24,7 +25,7 @@ export class EventsController {
   constructor(private readonly eventsService: EventsService) {}
 
   @Post()
-  @Roles(UserRole.MEMBER, UserRole.HOUSEHOLD_HEAD, UserRole.BRANCH_HEAD, UserRole.FAMILY_HEAD)
+  @Roles(Role.FAMILY_MEMBER, Role.FAMILY_HOUSEHOLD, Role.FAMILY_BRANCH, Role.FAMILY_LEADER)
   @UseInterceptors(FileFieldsInterceptor([{ name: 'files', maxCount: 10 }]))
   async create(
     @Body() createEventDto: CreateEventDto,
@@ -44,7 +45,7 @@ export class EventsController {
   }
 
   @Get(':id')
-  @Roles(UserRole.MEMBER, UserRole.HOUSEHOLD_HEAD, UserRole.BRANCH_HEAD, UserRole.FAMILY_HEAD)
+  @Roles(Role.FAMILY_MEMBER, Role.FAMILY_HOUSEHOLD, Role.FAMILY_BRANCH, Role.FAMILY_LEADER)
   async findOne(@Param('id') id: string, @Req() req: Request): Promise<ResponseDTO<EventResponse>> {
     logger.info(`[Handler] Fetch Event: ${id}`);
     const user = req.user; // Extract user
@@ -54,7 +55,7 @@ export class EventsController {
   
 
   @Patch(':id')
-  @Roles(UserRole.MEMBER, UserRole.HOUSEHOLD_HEAD, UserRole.BRANCH_HEAD, UserRole.FAMILY_HEAD)
+  @Roles(Role.FAMILY_MEMBER, Role.FAMILY_HOUSEHOLD, Role.FAMILY_BRANCH, Role.FAMILY_LEADER)
   @UseInterceptors(FileFieldsInterceptor([{ name: 'files', maxCount: 10 }]))
   async update(
     @Param('id') id: string,
@@ -75,7 +76,7 @@ export class EventsController {
   }
 
   @Delete(':id')
-  @Roles(UserRole.MEMBER, UserRole.HOUSEHOLD_HEAD, UserRole.BRANCH_HEAD, UserRole.FAMILY_HEAD)
+  @Roles(Role.FAMILY_MEMBER, Role.FAMILY_HOUSEHOLD, Role.FAMILY_BRANCH, Role.FAMILY_LEADER)
   async remove(@Param('id') id: string, @Req() req: Request): Promise<ResponseDTO<boolean>> {
     logger.info(`[Handler] Delete Event: ${id}`);
     const user = req.user;

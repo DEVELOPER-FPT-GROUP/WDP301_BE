@@ -4,6 +4,7 @@ export class MarriageDTO {
   marriedDate: Date;
   isDivorced?: boolean;
   divorcedDate?: Date;
+  createdByMemberId: string; // ✅ NEW
 
   static map(entity: any): MarriageDTO {
     return {
@@ -12,6 +13,7 @@ export class MarriageDTO {
       marriedDate: entity.marriedDate,
       isDivorced: entity.isDivorced || false,
       divorcedDate: entity.divorcedDate || null,
+      createdByMemberId: entity.createdByMemberId?.toString(), // ✅
     };
   }
 }
