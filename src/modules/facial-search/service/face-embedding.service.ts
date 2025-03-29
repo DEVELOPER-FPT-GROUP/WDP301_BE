@@ -4,6 +4,7 @@ import { winstonLogger as logger } from 'src/common/winston-logger';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs/promises';
+import { setupTFBackendAndLoadFaceAPI } from 'src/utils/tf-loader';
 
 export interface FaceEmbeddingResult {
   success: boolean;
@@ -54,26 +55,12 @@ export class FaceEmbeddingService {
 
   private async loadModels() {
     try {
-      const faceapi = await import('face-api.js');
-      const canvas = await import('canvas');
-      const { Canvas, Image } = canvas;
-
-      faceapi.env.monkeyPatch({ Canvas: Canvas as any, Image: Image as any });
-
-      const modelsPath = path.join(process.cwd(), 'models');
-      await Promise.all([
-        faceapi.nets.ssdMobilenetv1.loadFromDisk(modelsPath),
-        faceapi.nets.faceLandmark68Net.loadFromDisk(modelsPath),
-        faceapi.nets.faceRecognitionNet.loadFromDisk(modelsPath),
-      ]);
-
-      return faceapi;
+      return await setupTFBackendAndLoadFaceAPI();
     } catch (error) {
       logger.error(`❌ Failed to load face embedding models: ${error.message}`);
       throw new Error(`Failed to load face embedding models: ${error.message}`);
     }
   }
-
   /**
    * Original cosine similarity calculation (preserved for backward compatibility)
    */
