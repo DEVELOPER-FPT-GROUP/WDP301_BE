@@ -38,8 +38,8 @@ export class FacialSearchService {
     private readonly faceEmbeddingService: FaceEmbeddingService,
     private readonly membersRepository: MembersRepository,
     private readonly mediaRepository: MediaRepository,
-    @Inject(forwardRef(() => MediaService))
-    private readonly mediaService: MediaService,
+    // @Inject(forwardRef(() => MediaService))
+    // private readonly mediaService: MediaService,
   ) {}
 
   /**
@@ -518,4 +518,22 @@ export class FacialSearchService {
       throw new BadRequestException(`Face verification failed: ${error.message}`);
     }
   }
+
+   /**
+   * Check if an embedding already exists for the given media ID
+   * Prevents redundant processing of the same media item
+   * 
+   * @param mediaId ID of the media to check
+   * @returns true if embedding exists, false otherwise
+   */
+   async getExistingEmbedding(mediaId: string): Promise<boolean> {
+    try {
+      const embedding = await this.faceEmbeddingRepository.findByMediaId(mediaId);
+      return !!embedding;
+    } catch (error) {
+      return false; // Assume no embedding exists in case of error
+    }
+  }
+
+
 }

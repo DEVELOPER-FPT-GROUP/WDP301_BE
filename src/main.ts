@@ -3,6 +3,11 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpExceptionFilter } from './common/exceptions/exceptions';
+// import '@tensorflow/tfjs-node'; 
+
+
+
+
 // import * as bodyParser from 'body-parser';
 /**
  * whitelist: true => only allow the properties defined in the DTO but need defined decorator in DTO

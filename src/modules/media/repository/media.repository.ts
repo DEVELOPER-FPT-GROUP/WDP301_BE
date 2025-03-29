@@ -24,8 +24,13 @@ export class MediaRepository {
   }
 
   async update(id: string, updateData: Partial<Media>): Promise<Media | null> {
-    return this.mediaModel.findByIdAndUpdate(id, updateData, { new: true }).exec();
+    return this.mediaModel.findOneAndUpdate(
+      { mediaId: id },
+      updateData,
+      { new: true }
+    ).exec();
   }
+  
 
   async delete(id: string): Promise<Media | null> {
     return this.mediaModel.findOneAndDelete({ mediaId: id }).exec();
