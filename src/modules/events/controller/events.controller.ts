@@ -63,4 +63,13 @@ export class EventsController {
     const result = await this.eventsService.deleteEvent(id);
     return ResponseDTO.success(result, 'Event deleted successfully');
   }
+
+  // events.controller.ts
+  @Get('created-by/:username')
+  async findByCreatorUsername(@Param('username') username: string): Promise<ResponseDTO<EventResponse[]>> {
+    logger.info(`[Handler] Fetch Events by CreatedBy: ${username}`);
+    const events = await this.eventsService.getEventsByCreatorUsername(username);
+    return ResponseDTO.success(events, `Events created by ${username} fetched successfully`);
+  }
+
 }

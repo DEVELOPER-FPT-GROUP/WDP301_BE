@@ -36,11 +36,19 @@ export class FaceEmbeddingService {
     { startIdx: 96, endIdx: 127, weight: 0.7 },  // Forehead (lower weight)
   ];
 
+  
   constructor() {
     this.initService().catch((error) => {
       logger.error(`❌ Face embedding initialization failed: ${error.message}`);
     });
   }
+
+  /**
+ * Khởi tạo service khi được inject vào hệ thống:
+ * - Tạo thư mục tạm để xử lý ảnh (nếu chưa tồn tại).
+ * - Load các mô hình face-api từ đĩa vào bộ nhớ.
+ * - Đánh dấu trạng thái modelsLoaded để các method khác sử dụng.
+ */
 
   private async initService() {
     try {
@@ -53,6 +61,12 @@ export class FaceEmbeddingService {
     }
   }
 
+/**
+ * Gọi hàm load các mô hình nhận diện khuôn mặt:
+ * - Gồm ssdMobilenetv1, faceLandmark68Net, faceRecognitionNet.
+ * - Nếu có lỗi xảy ra trong quá trình tải, log lỗi và throw ra ngoài.
+ */
+
   private async loadModels() {
     try {
       return await setupTFBackendAndLoadFaceAPI();
@@ -62,7 +76,10 @@ export class FaceEmbeddingService {
     }
   }
   /**
-   * Original cosine similarity calculation (preserved for backward compatibility)
+   * Tính cosine similarity giữa hai vector khuôn mặt:
+   * - Trả về giá trị từ 0 đến 1 (1 là giống nhau hoàn toàn).
+   * - Sử dụng công thức cosine = dotProduct / (|A| * |B|).
+   * - Hàm gốc, giữ lại vì lý do tương thích ngược.
    */
   calculateSimilarity(descriptor1: Float32Array, descriptor2: Float32Array): number {
     if (!descriptor1 || !descriptor2 || descriptor1.length !== descriptor2.length) {
@@ -86,9 +103,10 @@ export class FaceEmbeddingService {
   }
 
   /**
-   * Calculate weighted cosine similarity between two face descriptors
-   * Applies different weights to different regions of the face descriptor
-   */
+ * Tính cosine similarity có trọng số giữa hai vector khuôn mặt:
+ * - Mỗi vùng đặc trưng trên khuôn mặt (mắt, mũi, miệng...) có trọng số riêng.
+ * - Cho phép tăng độ chính xác khi so sánh hai khuôn mặt.
+ */
   calculateWeightedSimilarity(descriptor1: Float32Array, descriptor2: Float32Array): number {
     if (!descriptor1 || !descriptor2 || descriptor1.length !== descriptor2.length) {
       return 0;
@@ -126,8 +144,10 @@ export class FaceEmbeddingService {
   }
 
   /**
-   * Improved weighted cosine similarity with dynamic region importance
-   */
+ * Tính cosine similarity nâng cao giữa hai vector khuôn mặt:
+ * - Trọng số cho mỗi vùng được điều chỉnh động dựa trên mức độ chênh lệch (variance).
+ * - Vùng nào khác biệt ít thì được ưu tiên trọng số cao hơn.
+ */
   calculateEnhancedSimilarity(descriptor1: Float32Array, descriptor2: Float32Array): number {
     if (!descriptor1 || !descriptor2 || descriptor1.length !== descriptor2.length) {
       return 0;
@@ -168,8 +188,10 @@ export class FaceEmbeddingService {
   }
 
   /**
-   * Calculate dynamic weights based on descriptor variance
-   */
+ * Tính toán trọng số động cho từng vùng descriptor:
+ * - Dựa trên phương sai giữa hai vector trong từng vùng.
+ * - Tăng trọng số cho vùng ổn định (ít thay đổi) để tăng độ tin cậy.
+ */
   private calculateDynamicWeights(descriptor1: Float32Array, descriptor2: Float32Array): RegionWeight[] {
     const dynamicWeights: RegionWeight[] = JSON.parse(JSON.stringify(this.FACE_REGION_WEIGHTS));
     
@@ -197,9 +219,10 @@ export class FaceEmbeddingService {
   }
 
   /**
-   * Calculate weighted Euclidean distance between face descriptors
-   * Lower values indicate better matches
-   */
+ * Tính khoảng cách Euclidean có trọng số giữa hai vector khuôn mặt:
+ * - Khoảng cách nhỏ hơn => hai khuôn mặt giống nhau hơn.
+ * - Trọng số áp dụng để ưu tiên các vùng quan trọng hơn.
+ */
   calculateWeightedDistance(descriptor1: Float32Array, descriptor2: Float32Array): number {
     if (!descriptor1 || !descriptor2 || descriptor1.length !== descriptor2.length) {
       return Infinity;
@@ -227,8 +250,10 @@ export class FaceEmbeddingService {
   }
 
   /**
-   * Manhattan distance for key facial feature points
-   */
+ * Tính khoảng cách Manhattan giữa các vùng trọng yếu trên khuôn mặt:
+ * - Chỉ tập trung vào mắt, mũi, miệng.
+ * - Dùng để hỗ trợ kiểm tra độ khác biệt rõ ràng ở những vùng dễ nhận biết.
+ */
   private calculateManhattanDistance(descriptor1: Float32Array, descriptor2: Float32Array): number {
     // Focus on critical regions (eyes, nose, mouth - indices determined by face-api.js)
     const keyPoints = [
@@ -254,8 +279,10 @@ export class FaceEmbeddingService {
   }
 
   /**
-   * Hybrid similarity score that combines multiple metrics
-   */
+ * Kết hợp nhiều thuật toán để tính điểm tương đồng giữa hai vector khuôn mặt:
+ * - Bao gồm: enhanced cosine similarity, normalized weighted distance, manhattan distance.
+ * - Trả về điểm tổng hợp từ 0 đến 1 thể hiện mức độ giống nhau.
+ */
   calculateHybridSimilarity(descriptor1: Float32Array, descriptor2: Float32Array): number {
     if (!descriptor1 || !descriptor2 || descriptor1.length !== descriptor2.length) {
       return 0;
@@ -284,8 +311,11 @@ export class FaceEmbeddingService {
   }
 
   /**
-   * Extract face descriptor (embedding) from an image
-   */
+ * Trích xuất vector đặc trưng khuôn mặt từ ảnh:
+ * - Chuyển ảnh sang định dạng phù hợp, điều chỉnh sáng & độ tương phản.
+ * - Dùng face-api để phát hiện khuôn mặt, landmark và sinh embedding.
+ * - Chỉ lấy khuôn mặt chính nếu có nhiều hơn 1 khuôn mặt.
+ */
   async extractFaceEmbedding(file: MulterFile): Promise<FaceEmbeddingResult> {
     try {
       logger.info(`🔍 Extracting face embedding for file: ${file.originalname}`);
@@ -349,8 +379,11 @@ export class FaceEmbeddingService {
   }
 
   /**
-   * Compare two faces and return similarity score using hybrid algorithm
-   */
+ * So sánh hai ảnh khuôn mặt để tính điểm tương đồng:
+ * - Trích xuất embedding cho từng ảnh.
+ * - Tính hybrid similarity score giữa hai vector.
+ * - Trả về điểm số từ 0 đến 1.
+ */
   async compareFaces(file1: MulterFile, file2: MulterFile): Promise<number> {
     const result1 = await this.extractFaceEmbedding(file1);
     const result2 = await this.extractFaceEmbedding(file2);
@@ -372,9 +405,10 @@ export class FaceEmbeddingService {
   }
   
   /**
-   * Check if two face embeddings are from the same person
-   * Returns true if the similarity score exceeds the threshold
-   */
+ * Kiểm tra xem hai vector embedding có thuộc cùng một người không:
+ * - Sử dụng hybrid similarity và so sánh với ngưỡng định trước (mặc định là 0.65).
+ * - Trả về true nếu giống nhau, ngược lại là false.
+ */
   isSamePerson(descriptor1: Float32Array, descriptor2: Float32Array, threshold = 0.65): boolean {
     const similarityScore = this.calculateHybridSimilarity(descriptor1, descriptor2);
     return similarityScore >= threshold;

@@ -35,4 +35,10 @@ export class EventsRepository {
   async findAll(): Promise<Event[]> {
     return this.eventModel.find().sort({ startDate: 1 }).exec();
   }
+
+  // events.repository.ts
+  async findByCreatorUsername(username: string): Promise<Event[]> {
+    return this.eventModel.find({ createdBy: username }).sort({ startDate: 1 }).exec();
+  }
+
 }

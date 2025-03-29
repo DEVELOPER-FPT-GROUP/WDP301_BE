@@ -129,4 +129,18 @@ export class EventsService implements IEventService {
     logger.info(`Event deleted successfully with ID: ${id}`);
     return true;
   }
+
+  // events.service.ts
+async getEventsByCreatorUsername(username: string): Promise<EventResponse[]> {
+  logger.http(`Fetching events created by user: ${username}`);
+  const events = await this.eventsRepository.findByCreatorUsername(username);
+  const enrichedEvents = await Promise.all(
+    events.map(async (event) => {
+      const mediaList = await this.mediaService.getMediaByOwners([event.eventId], 'Event');
+      return EventMapper.toResponseDto(event, mediaList);
+    }),
+  );
+  return enrichedEvents.map((event) => ({ event }));
+}
+
 }
