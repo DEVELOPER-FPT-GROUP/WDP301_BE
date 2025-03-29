@@ -34,6 +34,7 @@ import { MediaResponseDto } from '../../media/dto/response/media-response.dto';
 
 import { ChildDTO } from '../dto/response/child.dto';
 import { MediaService } from 'src/modules/media/serivce/media.service';
+import { FaceImageDto } from 'src/modules/media/dto/response/face-respone.dto';
 
 @Injectable()
 export class MembersService implements IMembersService {
@@ -47,37 +48,36 @@ export class MembersService implements IMembersService {
     private readonly mediaService: MediaService,
   ) {}
 
-  /**
-   * Creates a new member in the system.
-   * @param createMemberDto - The data transfer object containing member details.
-   * @returns The newly created member as a DTO.
-   */
+  private async handleMediaForMember(memberId: string, files: MulterFile[]): Promise<FaceImageDto[]> {
+    if (!files || files.length === 0) return [];
+  
+    // Detect face và upload
+    const faceImages = await this.mediaService.detectAndUploadFaces(
+      files[0],
+      memberId,
+    );
+  
+    // Chạy embedding nền
+    this.mediaService.embedFacesInBackground(faceImages);
+  
+    return faceImages;
+  }
+
+  
   async createMember(
     createMemberDto: CreateMemberDto,
     files: MulterFile[],
   ): Promise<MemberDTO> {
-    // console.log('createMemberDto:', createMemberDto);
     const createdMember = await this.membersRepository.create(createMemberDto);
-
-    console.log('files: ', files);
-    let detectedFaces: {
-      faceId: string;
-      previewUrl: string;
-      status: 'unknown';
-    }[] = [];
-
-    if (files && files.length > 0) {
-      detectedFaces = await this.mediaService.processAndUploadAvatar(
-        files[0],
-        String(createdMember._id),
-        'Member',
-      );
-    }
-
-    // Return member info along with detected face previews for verification
+  
+    const faceImages = await this.handleMediaForMember(
+      String(createdMember._id),
+      files,
+    );
+  
     const memberDTO = MemberDTO.map(createdMember);
-    memberDTO.media = detectedFaces; // Attach preview images for verification
-
+    memberDTO.media = faceImages;
+  
     return memberDTO;
   }
 
@@ -85,46 +85,34 @@ export class MembersService implements IMembersService {
     createMemberDto: CreateMemberDto,
     files: MulterFile[],
   ): Promise<MemberDTO> {
-    console.log('createMemberDto:', createMemberDto);
     const createdMember = await this.membersRepository.create(createMemberDto);
-
-    console.log('files: ', files);
-    let detectedFaces: {
-      faceId: string;
-      previewUrl: string;
-      status: 'unknown';
-    }[] = [];
-
-    if (files && files.length > 0) {
-      detectedFaces = await this.mediaService.processAndUploadAvatar(
-        files[0],
-        String(createdMember._id),
-        'Member',
-      );
-    }
-
-    // Create an account for the member if they are alive
+  
+    const faceImages = await this.handleMediaForMember(
+      String(createdMember._id),
+      files,
+    );
+  
     if (createdMember.isAlive) {
       const createAccountDto = Object.assign(new CreateAccountDto(), {
         memberId: String(createdMember._id),
-        // Generates a unique username based on the child's name
         username: DataUtils.generateUniqueUsername(
           createdMember.firstName,
           createdMember.middleName || '',
           createdMember.lastName,
         ),
-        passwordHash: '123456', // Default password (should be securely managed)
+        passwordHash: '123456',
         role: Role.FAMILY_MEMBER,
       });
+  
       await this.accountsService.createAccount(createAccountDto);
     }
-
-    // Return member info along with detected face previews for verification
+  
     const memberDTO = MemberDTO.map(createdMember);
-    memberDTO.media = detectedFaces; // Attach preview images for verification
-
+    memberDTO.media = faceImages;
+  
     return memberDTO;
   }
+  
 
   /**
    * Retrieves a member by their unique ID.

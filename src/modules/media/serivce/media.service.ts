@@ -11,6 +11,7 @@ import { winstonLogger as logger } from 'src/common/winston-logger';
 import { MediaUploadService } from './media-upload.service';
 import { FaceProcessingService } from './face-processing.service';
 import { MulterFile } from 'src/common/types/multer-file.type';
+import { FaceImageDto } from '../dto/response/face-respone.dto';
 
 @Injectable()
 export class MediaService {
@@ -78,13 +79,40 @@ export class MediaService {
     return mediaList.map(MediaMapper.toResponseDto);
   }
 
-  async processAndUploadAvatar(
+  async detectAndUploadFaces(
     file: MulterFile,
     ownerId: string,
-    ownerType: 'Member'
-  ): Promise<{ faceId: string; previewUrl: string; status: 'unknown' }[]> {
-    return this.faceProcessingService.processAndUploadAvatar(file, ownerId);
+  ): Promise<FaceImageDto[]> {
+    // Gọi service detect khuôn mặt và upload ảnh khuôn mặt
+    return this.faceProcessingService.detectAndUploadFaces(file, ownerId);
   }
+  
+  async embedFacesInBackground(faceImages: FaceImageDto[]): Promise<void> {
+    // ❌ Không dùng embedAsync nữa — dùng trực tiếp logic nền
+    if (!faceImages || faceImages.length === 0) return;
+  
+    const queue: { mediaId: string; memberId: string }[] = [];
+  
+    for (const face of faceImages) {
+      const media = await this.faceProcessingService.getMediaById(face.faceId);
+      if (media?.ownerId) {
+        queue.push({
+          mediaId: face.faceId,
+          memberId: String(media.ownerId),
+        });
+      }
+    }
+  
+    if (queue.length === 0) {
+      logger.warn('⛔ Không có khuôn mặt hợp lệ để xử lý embedding nền');
+      return;
+    }
+  
+    // Thêm vào hàng đợi nền
+    this.faceProcessingService.enqueueEmbedding(queue);
+  }
+  
+
 
   async verifyAndUploadFaces(
     verifiedFaces: { faceId: string; memberId: string; status: 'avatar' | 'label' | 'unknown' }[]
@@ -98,4 +126,6 @@ export class MediaService {
   ): Promise<void> {
     return this.mediaUploadService.deleteUnknownFaces(unknownFaces);
   }
+
+  
 }
