@@ -34,6 +34,7 @@ import { MediaResponseDto } from '../../media/dto/response/media-response.dto';
 
 import { ChildDTO } from '../dto/response/child.dto';
 import { MediaService } from 'src/modules/media/serivce/media.service';
+import { console } from 'inspector';
 
 @Injectable()
 export class MembersService implements IMembersService {
@@ -47,78 +48,79 @@ export class MembersService implements IMembersService {
     private readonly mediaService: MediaService,
   ) {}
 
-
- /**
- * Handle avatar processing for a newly created member.
- * Returns either MediaResponseDto (auto avatar) or list of face previews for manual verification.
- */
- async handleAvatarUploadForMember(
-  file: MulterFile,
-  memberId: string
-): Promise<MediaResponseDto | { faceId: string; previewUrl: string; status: 'unknown' }[]> {
-  return this.mediaService.processAndUploadAvatar(file, memberId, 'Member');
-}
-
-
-
-async createMember(
-  createMemberDto: CreateMemberDto,
-  files: MulterFile[],
-): Promise<MemberDTO> {
-  const createdMember = await this.membersRepository.create(createMemberDto);
-
-  let media: MediaResponseDto | { faceId: string; previewUrl: string; status: 'unknown' }[] = [];
-
-  if (files && files.length > 0) {
-    media = await this.handleAvatarUploadForMember(
-      files[0],
-      String(createdMember._id),
-    );
+  /**
+   * Handle avatar processing for a newly created member.
+   * Returns either MediaResponseDto (auto avatar) or list of face previews for manual verification.
+   */
+  async handleAvatarUploadForMember(
+    file: MulterFile,
+    memberId: string,
+  ): Promise<
+    | MediaResponseDto
+    | { faceId: string; previewUrl: string; status: 'unknown' }[]
+  > {
+    return this.mediaService.processAndUploadAvatar(file, memberId, 'Member');
   }
 
-  const memberDTO = MemberDTO.map(createdMember);
-  memberDTO.media = Array.isArray(media) ? media : [media];
+  async createMember(
+    createMemberDto: CreateMemberDto,
+    files: MulterFile[],
+  ): Promise<MemberDTO> {
+    const createdMember = await this.membersRepository.create(createMemberDto);
 
-  return memberDTO;
-}
+    let media:
+      | MediaResponseDto
+      | { faceId: string; previewUrl: string; status: 'unknown' }[] = [];
 
+    if (files && files.length > 0) {
+      media = await this.handleAvatarUploadForMember(
+        files[0],
+        String(createdMember._id),
+      );
+    }
 
-async createRootMember(
-  createMemberDto: CreateMemberDto,
-  files: MulterFile[],
-): Promise<MemberDTO> {
-  const createdMember = await this.membersRepository.create(createMemberDto);
+    const memberDTO = MemberDTO.map(createdMember);
+    memberDTO.media = Array.isArray(media) ? media : [media];
 
-  let media: MediaResponseDto | { faceId: string; previewUrl: string; status: 'unknown' }[] = [];
-
-  if (files && files.length > 0) {
-    media = await this.handleAvatarUploadForMember(
-      files[0],
-      String(createdMember._id),
-    );
+    return memberDTO;
   }
 
-  if (createdMember.isAlive) {
-    const createAccountDto = Object.assign(new CreateAccountDto(), {
-      memberId: String(createdMember._id),
-      username: DataUtils.generateUniqueUsername(
-        createdMember.firstName,
-        createdMember.middleName || '',
-        createdMember.lastName,
-      ),
-      passwordHash: '123456',
-      role: Role.FAMILY_MEMBER,
-    });
-    await this.accountsService.createAccount(createAccountDto);
+  async createRootMember(
+    createMemberDto: CreateMemberDto,
+    files: MulterFile[],
+  ): Promise<MemberDTO> {
+    const createdMember = await this.membersRepository.create(createMemberDto);
+
+    let media:
+      | MediaResponseDto
+      | { faceId: string; previewUrl: string; status: 'unknown' }[] = [];
+
+    if (files && files.length > 0) {
+      media = await this.handleAvatarUploadForMember(
+        files[0],
+        String(createdMember._id),
+      );
+    }
+
+    if (createdMember.isAlive) {
+      const createAccountDto = Object.assign(new CreateAccountDto(), {
+        memberId: String(createdMember._id),
+        username: DataUtils.generateUniqueUsername(
+          createdMember.firstName,
+          createdMember.middleName || '',
+          createdMember.lastName,
+        ),
+        passwordHash: '123456',
+        role: Role.FAMILY_MEMBER,
+      });
+      await this.accountsService.createAccount(createAccountDto);
+    }
+
+    const memberDTO = MemberDTO.map(createdMember);
+    memberDTO.media = Array.isArray(media) ? media : [media];
+
+    return memberDTO;
   }
-
-  const memberDTO = MemberDTO.map(createdMember);
-  memberDTO.media = Array.isArray(media) ? media : [media];
-
-  return memberDTO;
-}
-
-  
 
   /**
    * Retrieves a member by their unique ID.
@@ -269,6 +271,73 @@ async createRootMember(
   //     return memberDTO;
   //   });
   // }
+  async searchMembers(
+    familyId: string,
+    searchDto: SearchMemberDto,
+  ): Promise<PaginationDTO<MemberDTO>> {
+    const { page = 1, limit = 10 } = searchDto;
+    const filters: any = {};
+
+    if (searchDto.search) {
+      // Tách từ khóa tìm kiếm thành các từ riêng biệt
+      const searchTerms = searchDto.search.trim().split(/\s+/);
+
+      // Tạo danh sách điều kiện tìm kiếm cho từng từ
+      const termFilters = searchTerms.map((term) => {
+        const wordRegex = new RegExp(term, 'i');
+        return {
+          $or: [
+            { firstName: wordRegex },
+            { middleName: wordRegex },
+            { lastName: wordRegex },
+            { fullName: wordRegex }, // Nếu có trường fullName
+          ],
+        };
+      });
+
+      // Kết hợp các điều kiện với $and - TẤT CẢ các từ phải được tìm thấy
+      filters.$and = termFilters;
+    }
+
+    // Phần còn lại của code
+    if (searchDto.email) {
+      filters.email = new RegExp(searchDto.email, 'i');
+    }
+
+    if (searchDto.isAlive !== undefined) {
+      filters.isAlive = searchDto.isAlive;
+    }
+
+    if (searchDto.gender) {
+      filters.gender = searchDto.gender;
+    }
+
+    // Handle isDeleted filter
+    if (searchDto.isDeleted !== undefined) {
+      filters.isDeleted = searchDto.isDeleted;
+    } else {
+      // By default, only show non-deleted members
+      filters.isDeleted = false;
+    }
+
+    filters.familyId = familyId;
+
+    const { members, total } = await this.membersRepository.findByFilters(
+      filters,
+      page,
+      limit,
+    );
+    const memberIds = members.map((m) => String(m._id));
+    const mediaMap = await this.getMediaMap(memberIds);
+
+    const memberDTOs = members.map((member) => {
+      const memberDTO = MemberDTO.map(member);
+      memberDTO.media =
+        mediaMap.get(String(member._id))?.map((media) => media.url) || [];
+      return memberDTO;
+    });
+    return PaginationDTO.create(memberDTOs, total, page, limit);
+  }
 
   async findMembersInFamily(familyId: string): Promise<any> {
     const family = await this.familiesService.getFamilyById(familyId);
@@ -1168,67 +1237,6 @@ async createRootMember(
 
     const members = await this.membersRepository.findWithoutPagination(filters);
     return members.map(MemberDTO.map);
-  }
-
-  async searchMembers(
-    familyId: string,
-    searchDto: SearchMemberDto,
-  ): Promise<PaginationDTO<MemberDTO>> {
-    const { page = 1, limit = 10 } = searchDto;
-    const filters: any = {};
-
-    if (searchDto.search) {
-      // Tách từ khóa tìm kiếm thành các từ riêng biệt
-      const searchTerms = searchDto.search.trim().split(/\s+/);
-
-      // Tạo danh sách điều kiện tìm kiếm cho từng từ
-      const termFilters = searchTerms.map((term) => {
-        const wordRegex = new RegExp(term, 'i');
-        return {
-          $or: [
-            { firstName: wordRegex },
-            { middleName: wordRegex },
-            { lastName: wordRegex },
-            { fullName: wordRegex }, // Nếu có trường fullName
-          ],
-        };
-      });
-
-      // Kết hợp các điều kiện với $and - TẤT CẢ các từ phải được tìm thấy
-      filters.$and = termFilters;
-    }
-
-    // Phần còn lại của code
-    if (searchDto.email) {
-      filters.email = new RegExp(searchDto.email, 'i');
-    }
-
-    if (searchDto.isAlive !== undefined) {
-      filters.isAlive = searchDto.isAlive;
-    }
-
-    if (searchDto.gender) {
-      filters.gender = searchDto.gender;
-    }
-
-    // Handle isDeleted filter
-    if (searchDto.isDeleted !== undefined) {
-      filters.isDeleted = searchDto.isDeleted;
-    } else {
-      // By default, only show non-deleted members
-      filters.isDeleted = false;
-    }
-
-    filters.familyId = familyId;
-
-    const { members, total } = await this.membersRepository.findByFilters(
-      filters,
-      page,
-      limit,
-    );
-    const memberDTOs = members.map(MemberDTO.map);
-
-    return PaginationDTO.create(memberDTOs, total, page, limit);
   }
 
   /**
