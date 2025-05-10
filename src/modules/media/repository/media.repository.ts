@@ -1,0 +1,74 @@
+import { Injectable } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { Media, MediaDocument } from '../schema/media.schema';
+
+@Injectable()
+export class MediaRepository {
+  constructor(@InjectModel(Media.name) private readonly mediaModel: Model<MediaDocument>) {}
+
+  async create(media: Media): Promise<Media> {
+    return new this.mediaModel(media).save();
+  }
+
+  async findAll(): Promise<Media[]> {
+    return this.mediaModel.find().exec();
+  }
+
+  async findById(id: string): Promise<Media | null> {
+    return this.mediaModel.findOne({ mediaId: id }).exec();
+  }
+
+  async findByOwner(ownerId: string, ownerType: 'Event' | 'Member' | 'FamilyHistory'): Promise<Media[]> {
+    return this.mediaModel.find({ ownerId: ownerId, ownerType: ownerType }).exec();
+  }
+
+  async update(id: string, updateData: Partial<Media>): Promise<Media | null> {
+    return this.mediaModel.findByIdAndUpdate(id, updateData, { new: true }).exec();
+  }
+
+  async delete(id: string): Promise<Media | null> {
+    return this.mediaModel.findOneAndDelete({ mediaId: id }).exec();
+  }
+
+  async findByOwners(ownerIds: string[], ownerType: 'Event' | 'Member' | 'FamilyHistory'): Promise<Media[]> {
+    return this.mediaModel.find({ ownerId: { $in: ownerIds }, ownerType: ownerType }).exec();
+  }
+
+  async createMany(mediaEntities: Media[]): Promise<Media[]> {
+    // Insert and retrieve the stored documents
+    const result = await this.mediaModel.insertMany(mediaEntities);
+
+    // Fetch the newly inserted documents from the database to ensure mediaId is included
+    const insertedIds = result.map((doc) => doc._id);
+    return await this.mediaModel.find({ _id: { $in: insertedIds } });
+}
+
+
+  async findByIds(ids: string[]): Promise<Media[]> {
+    return this.mediaModel.find({ mediaId: { $in: ids } }).exec();
+  }
+  
+  async deleteMany(ids: string[]): Promise<void> {
+    await this.mediaModel.deleteMany({ mediaId: { $in: ids } }).exec();
+  }
+
+  async findByStatus(
+    status: 'unknown' | 'avatar' | 'label',
+    ownerType: 'Member'
+  ): Promise<Media[]> {
+    return this.mediaModel.find({ ownerType, status }).exec();
+  }
+
+  async deleteByStatus(
+    status: 'unknown' | 'avatar' | 'label',
+    ownerType: 'Member'
+  ): Promise<void> {
+    await this.mediaModel.deleteMany({ ownerType, status }).exec();
+  }
+
+  async updateManyByCondition(filter: any, update: any): Promise<void> {
+    await this.mediaModel.updateMany(filter, { $set: update });
+  }
+  
+}

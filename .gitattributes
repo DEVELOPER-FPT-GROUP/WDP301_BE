@@ -1,0 +1,10 @@
+# Force text files to use LF in repo, auto convert to platform's EOL in working copy
+* text=auto
+
+# Force specific files to use LF in repo and working copy (optional)
+*.js text eol=lf
+*.ts text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.sh text eol=lf
